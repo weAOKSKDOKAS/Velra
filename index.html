@@ -658,63 +658,122 @@ function impactRank(v){
 // ===== Client-side sector inference (fallback when worker data lacks sector info) =====
 const SECTOR_KW = {
   TECHNOLOGY: [
-    "tech","technology","teknologi","ai","artificial intelligence","kecerdasan buatan",
-    "semiconductor","semikonduktor","chip","gpu","nvidia","amd","tsmc",
-    "software","saas","cloud","aws","azure","gcp","cybersecurity","ransomware","data breach",
-    "smartphone","iphone","android","telecom","5g","internet","startup","venture",
-    "robot","automation","quantum","openai","gemini","anthropic","meta","google","apple","microsoft"
+    "tech","technology","teknologi","digital","digitalisasi","digitalization",
+    "ai","artificial intelligence","kecerdasan buatan","machine learning","deep learning",
+    "semiconductor","semikonduktor","chip","chipset","gpu","cpu","prosesor","processor",
+    "nvidia","amd","tsmc","intel","qualcomm","broadcom","asml",
+    "software","saas","cloud","aws","azure","gcp","cybersecurity","ransomware","data breach","siber",
+    "smartphone","iphone","android","handphone","gadget","perangkat","device",
+    "telecom","telekomunikasi","telkom","indosat","xl","5g","4g","internet","wifi","fiber","optik",
+    "startup","venture","unicorn","fintech","edtech","healthtech",
+    "robot","robotik","automation","otomasi","quantum","computing","komputasi",
+    "openai","chatgpt","gemini","anthropic","meta","google","apple","microsoft","amazon","samsung","sony",
+    "aplikasi","app","platform","website","e-mail","data center","pusat data",
+    "streaming","netflix","spotify","tiktok","youtube","instagram","whatsapp",
+    "blockchain","crypto","bitcoin","ethereum","kripto","nft","web3",
+    "gopay","dana","ovo","shopeepay","tokopedia","bukalapak","blibli"
   ],
   FINANCE: [
-    "bank","banking","perbankan","lender","loan","kredit","mortgage","deposit",
-    "central bank","bank sentral","fed","fomc","ecb","boj","bi","bank indonesia","ojk",
-    "interest rate","suku bunga","rate cut","rate hike","yield","bond","obligasi","treasury",
-    "inflation","cpi","ppi","unemployment","nfp","gdp","resesi","recession",
-    "forex","currency","dollar","usd","eur","jpy","rupiah","idr","dxy",
-    "stocks","stock","shares","equity","index","indices","bursa","ihsg","idx","nasdaq","s&p","dow","wall street",
-    "trading","sell-off","rally","market","risk-on","risk-off","capital flow","outflow","inflow",
-    "earnings","profit","laba","guidance","dividend","buyback","ipo"
+    "bank","banking","perbankan","keuangan","finansial","financial",
+    "bca","bri","bni","mandiri","bsi","cimb","danamon","permata","mega","btn","bbca","bbri","bbni","bmri",
+    "central bank","bank sentral","fed","fomc","ecb","boj","boe","rba","pboc","bi rate",
+    "bank indonesia","ojk","idx","bei","bursa efek",
+    "interest rate","suku bunga","rate cut","rate hike","dovish","hawkish",
+    "yield","bond","obligasi","treasury","sbn","sukuk",
+    "inflation","inflasi","deflasi","deflation","cpi","ppi","unemployment","nfp","gdp","pdb",
+    "resesi","recession","recovery","pemulihan",
+    "forex","currency","mata uang","dollar","dolar","usd","eur","jpy","rupiah","idr","dxy","valas",
+    "saham","stocks","stock","shares","equity","ekuitas","investasi","investment","investor","reksadana","mutual fund",
+    "index","indices","indeks","bursa","ihsg","idx","lq45","nasdaq","s&p","dow","wall street","nikkei","hang seng","kospi",
+    "trading","perdagangan","transaksi","sell-off","rally","bullish","bearish","koreksi","correction",
+    "market","pasar","pasar modal","capital market","risk-on","risk-off",
+    "capital flow","outflow","inflow","asing","foreign","asing jual","asing beli","net buy","net sell",
+    "earnings","profit","laba","rugi","loss","pendapatan","revenue","guidance","dividend","dividen","buyback","ipo","rights issue",
+    "asuransi","insurance","leasing","multifinance","pinjaman","kredit","loan","mortgage",
+    "fintech","p2p","paylater","payment","pembayaran"
   ],
   MINING_ENERGY: [
-    "oil","crude","brent","wti","opec","gas","lng","natural gas","diesel","fuel","bbm",
-    "energy","energi","power","electricity","listrik","utility",
-    "coal","batubara","mining","tambang","minerals","mineral","smelter","refinery",
-    "nickel","nikel","copper","tembaga","tin","timah","bauxite",
-    "gold","emas","silver","perak","platinum","palladium",
-    "ev","electric vehicle","baterai","battery","lithium","rare earth"
+    "oil","crude","brent","wti","opec","opec+","minyak","minyak mentah","minyak dunia",
+    "gas","lng","natural gas","gas alam","gas bumi","diesel","fuel","bbm","pertamina","bensin","solar",
+    "energy","energi","power","electricity","listrik","pln","utility","pembangkit","pltu","plta","plts",
+    "ebt","renewable","terbarukan","solar panel","wind","angin","geothermal","panas bumi",
+    "coal","batubara","batu bara","adaro","bumi resources","itmg","ptba",
+    "mining","tambang","pertambangan","minerals","mineral","smelter","hilirisasi","refinery",
+    "nickel","nikel","copper","tembaga","tin","timah","bauxite","bauksit","alumina","aluminium",
+    "gold","emas","silver","perak","platinum","palladium","logam mulia","antam",
+    "ev","electric vehicle","kendaraan listrik","baterai","battery","lithium","rare earth","kobalt","cobalt",
+    "freeport","vale","aneka tambang","bukit asam","medco","elnusa"
   ],
   HEALTHCARE: [
-    "health","healthcare","kesehatan","hospital","rumahsakit","clinic","klinik",
-    "pharma","farmasi","drug","obat","vaccine","vaksin","biotech",
-    "medical","medis","doctor","dokter","bpjs"
+    "health","healthcare","kesehatan","sehat","hospital","rumah sakit","rs","rsud",
+    "clinic","klinik","pharmacy","farmasi","apotek",
+    "pharma","pharmaceutical","drug","obat","vaccine","vaksin","booster","imunisasi",
+    "biotech","bioteknologi","biofarmasi","genomic",
+    "medical","medis","kedokteran","doctor","dokter","perawat","nurse","nakes","tenaga kesehatan",
+    "bpjs","jkn","kalbe","sido muncul","kimia farma","bio farma","indofarma","phapros",
+    "who","pandemic","pandemi","endemic","endemi","outbreak","wabah",
+    "covid","virus","flu","demam","penyakit","disease","cancer","kanker",
+    "fda","bpom","clinical trial","uji klinis","riset kesehatan",
+    "alat kesehatan","alkes","diagnostik","diagnostic","lab","laboratorium"
   ],
   REGULATION: [
-    "regulation","regulasi","regulator","policy","kebijakan","law","undang-undang","peraturan",
-    "sanction","sanksi","ban","larangan","tariff","tarif","tax","pajak","subsidy","subsidi",
-    "antitrust","competition","monopoly","probe","investigation","penyelidikan",
-    "sec","doj","ftc","ojk","kppu","kemenkeu"
+    "regulation","regulasi","regulator","regulated","policy","kebijakan","aturan","peraturan",
+    "law","hukum","undang-undang","uu","perppu","pp","permen",
+    "government","pemerintah","pemerintahan","kementerian","ministry",
+    "sanction","sanksi","embargo","ban","larangan","restriction","pembatasan",
+    "tariff","tarif","bea masuk","bea cukai","customs","trade war","perang dagang",
+    "tax","pajak","ppn","pph","cukai","fiskal","fiscal","apbn","apbd","anggaran","budget",
+    "subsidy","subsidi","insentif","incentive","stimulus",
+    "antitrust","competition","monopoly","persaingan","merger","akuisisi","acquisition",
+    "probe","investigation","penyelidikan","korupsi","corruption","kpk","kejaksaan",
+    "sec","doj","ftc","ojk","bi","kppu","kemenkeu","bappebti","lps","kominfo",
+    "dpr","dprd","presiden","president","menteri","minister","gubernur","governor",
+    "election","pemilu","pilkada","politik","political","geopolitik","geopolitical",
+    "omnibus","cipta kerja","perizinan","licensing","compliance","kepatuhan",
+    "sidang","tribunal","court","pengadilan","putusan","verdict","ruling"
   ],
   CONSUMER: [
-    "consumer","konsumen","retail","ritel","fmcg","e-commerce","ecommerce","marketplace",
-    "shopping","belanja","sales","penjualan","spending",
-    "travel","tourism","pariwisata","airline","maskapai","hotel","restaurant","restoran",
-    "food","makanan","beverage","minuman","grocery","supermarket",
-    "automotive","otomotif","car","mobil","motorcycle","motor","gojek","grab"
+    "consumer","konsumen","retail","ritel","eceran","fmcg","consumer goods","barang konsumsi",
+    "e-commerce","ecommerce","marketplace","toko online","online shop",
+    "shopping","belanja","mall","pusat perbelanjaan",
+    "sales","penjualan","spending","konsumsi","consumption","daya beli","purchasing power",
+    "travel","tourism","pariwisata","wisata","wisatawan","tourist",
+    "airline","maskapai","garuda","lion air","airasia","citilink","penerbangan","flight",
+    "hotel","resort","restoran","restaurant","cafe","kafe",
+    "food","makanan","beverage","minuman","grocery","supermarket","minimarket","indomaret","alfamart",
+    "unilever","indofood","mayora","wings","kapal api","abc","sosro",
+    "automotive","otomotif","car","mobil","motorcycle","motor","sepeda motor",
+    "toyota","honda","suzuki","daihatsu","mitsubishi","hyundai","astra","adira",
+    "gojek","grab","shopee","tokopedia","lazada","bukalapak","blibli","traveloka",
+    "properti","property","real estate","rumah","house","apartemen","apartment",
+    "fashion","pakaian","clothing","sepatu","shoes","brand","merek"
   ],
 };
 
-function clientInferSectors(headline){
-  const t = String(headline||"").toLowerCase();
-  if (!t) return [];
+function clientInferSectors(text){
+  const t = String(text||"").toLowerCase();
+  if (!t || t.length < 3) return [];
   const matched = [];
   for (const [sector, kws] of Object.entries(SECTOR_KW)) {
     let score = 0;
     for (const kw of kws) {
-      if (kw.includes(" ") || kw.includes("/") || kw.includes("-")) {
+      if (kw.includes(" ") || kw.includes("/") || kw.includes("-") || kw.includes("&")) {
+        // multi-word / compound: substring match
         if (t.includes(kw)) score += 2;
-      } else {
-        // word boundary match for short keywords
+      } else if (kw.length <= 3) {
+        // very short keywords (ai, ev, bi, rs, uu, pp etc.): use word boundary
         const re = new RegExp("\\b" + kw.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "\\b", "i");
         if (re.test(t)) score += 1;
+      } else {
+        // Longer single words: try word boundary first, then substring fallback
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+        const re = new RegExp("\\b" + escaped + "\\b", "i");
+        if (re.test(t)) {
+          score += 1;
+        } else if (kw.length >= 5 && t.includes(kw)) {
+          // substring fallback for longer keywords (avoids false positives on short ones)
+          score += 1;
+        }
       }
     }
     if (score > 0) matched.push({ sector, score });
@@ -726,10 +785,14 @@ function clientInferSectors(headline){
 function itemMatchesSector(item, sector){
   // 1. Direct match on item.sector
   if (item.sector === sector) return true;
-  // 2. Match on item.sectors array (from worker)
+  // 2. Match on item.sectors array (from worker or enriched)
   if (Array.isArray(item.sectors) && item.sectors.includes(sector)) return true;
-  // 3. Client-side keyword inference from headline + keypoints
-  const text = [item.headline, ...(item.keypoints||[])].join(" ");
+  // 3. Client-side keyword inference from ALL available text
+  const parts = [item.headline];
+  if (Array.isArray(item.keypoints)) parts.push(...item.keypoints);
+  if (item.story) parts.push(item.story);
+  if (item.category) parts.push(item.category);
+  const text = parts.join(" ");
   const inferred = clientInferSectors(text);
   return inferred.includes(sector);
 }
@@ -761,11 +824,16 @@ function normalizeData(raw){
         story: x.story || x.body || "",
         category: x.category || null,
       };
-      // Enrich with client-side sector inference if sectors[] is empty
+      // Enrich with client-side sector inference if sectors[] is empty or only GENERAL
       if (!item.sectors.length || (item.sectors.length === 1 && item.sectors[0] === "GENERAL")) {
-        const inferred = clientInferSectors([item.headline, ...item.keypoints].join(" "));
+        const inferText = [item.headline, ...item.keypoints, item.story, item.category].filter(Boolean).join(" ");
+        const inferred = clientInferSectors(inferText);
         if (inferred.length) {
           item.sectors = inferred;
+          // Also update primary sector if it was GENERAL
+          if (item.sector === "GENERAL") {
+            item.sector = inferred[0];
+          }
         }
       }
       return item;
@@ -803,6 +871,28 @@ async function fetchData(){
   const r = await fetch(url, { cache:"no-store" });
   const raw = await r.json();
   state.data = normalizeData(raw);
+
+  // Debug: log sector distribution after normalization
+  const sectorDist = {};
+  for (const it of state.data.livewire) {
+    sectorDist[it.sector] = (sectorDist[it.sector] || 0) + 1;
+  }
+  console.log("[VELRA DEBUG] Total livewire items:", state.data.livewire.length);
+  console.log("[VELRA DEBUG] By primary sector:", JSON.stringify(sectorDist));
+
+  // Debug: sample items for each region
+  for (const region of REGIONS) {
+    const regionItems = state.data.livewire.filter(x => x.region === region);
+    console.log(`[VELRA DEBUG] ${region}: ${regionItems.length} items`);
+    if (regionItems.length > 0) {
+      console.log(`[VELRA DEBUG] ${region} sample headlines:`, regionItems.slice(0,3).map(x => `[${x.sector}] ${x.headline}`));
+    }
+    for (const sector of SECTORS) {
+      if (sector === "GENERAL") continue;
+      const count = filteredWire(region, sector).length;
+      if (count > 0) console.log(`[VELRA DEBUG] ${region}/${sector}: ${count} items`);
+    }
+  }
 }
 
 function renderNav(){
