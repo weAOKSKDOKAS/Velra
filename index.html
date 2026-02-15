@@ -655,6 +655,85 @@ function impactRank(v){
   return 0;
 }
 
+// ===== Client-side sector inference (fallback when worker data lacks sector info) =====
+const SECTOR_KW = {
+  TECHNOLOGY: [
+    "tech","technology","teknologi","ai","artificial intelligence","kecerdasan buatan",
+    "semiconductor","semikonduktor","chip","gpu","nvidia","amd","tsmc",
+    "software","saas","cloud","aws","azure","gcp","cybersecurity","ransomware","data breach",
+    "smartphone","iphone","android","telecom","5g","internet","startup","venture",
+    "robot","automation","quantum","openai","gemini","anthropic","meta","google","apple","microsoft"
+  ],
+  FINANCE: [
+    "bank","banking","perbankan","lender","loan","kredit","mortgage","deposit",
+    "central bank","bank sentral","fed","fomc","ecb","boj","bi","bank indonesia","ojk",
+    "interest rate","suku bunga","rate cut","rate hike","yield","bond","obligasi","treasury",
+    "inflation","cpi","ppi","unemployment","nfp","gdp","resesi","recession",
+    "forex","currency","dollar","usd","eur","jpy","rupiah","idr","dxy",
+    "stocks","stock","shares","equity","index","indices","bursa","ihsg","idx","nasdaq","s&p","dow","wall street",
+    "trading","sell-off","rally","market","risk-on","risk-off","capital flow","outflow","inflow",
+    "earnings","profit","laba","guidance","dividend","buyback","ipo"
+  ],
+  MINING_ENERGY: [
+    "oil","crude","brent","wti","opec","gas","lng","natural gas","diesel","fuel","bbm",
+    "energy","energi","power","electricity","listrik","utility",
+    "coal","batubara","mining","tambang","minerals","mineral","smelter","refinery",
+    "nickel","nikel","copper","tembaga","tin","timah","bauxite",
+    "gold","emas","silver","perak","platinum","palladium",
+    "ev","electric vehicle","baterai","battery","lithium","rare earth"
+  ],
+  HEALTHCARE: [
+    "health","healthcare","kesehatan","hospital","rumahsakit","clinic","klinik",
+    "pharma","farmasi","drug","obat","vaccine","vaksin","biotech",
+    "medical","medis","doctor","dokter","bpjs"
+  ],
+  REGULATION: [
+    "regulation","regulasi","regulator","policy","kebijakan","law","undang-undang","peraturan",
+    "sanction","sanksi","ban","larangan","tariff","tarif","tax","pajak","subsidy","subsidi",
+    "antitrust","competition","monopoly","probe","investigation","penyelidikan",
+    "sec","doj","ftc","ojk","kppu","kemenkeu"
+  ],
+  CONSUMER: [
+    "consumer","konsumen","retail","ritel","fmcg","e-commerce","ecommerce","marketplace",
+    "shopping","belanja","sales","penjualan","spending",
+    "travel","tourism","pariwisata","airline","maskapai","hotel","restaurant","restoran",
+    "food","makanan","beverage","minuman","grocery","supermarket",
+    "automotive","otomotif","car","mobil","motorcycle","motor","gojek","grab"
+  ],
+};
+
+function clientInferSectors(headline){
+  const t = String(headline||"").toLowerCase();
+  if (!t) return [];
+  const matched = [];
+  for (const [sector, kws] of Object.entries(SECTOR_KW)) {
+    let score = 0;
+    for (const kw of kws) {
+      if (kw.includes(" ") || kw.includes("/") || kw.includes("-")) {
+        if (t.includes(kw)) score += 2;
+      } else {
+        // word boundary match for short keywords
+        const re = new RegExp("\\b" + kw.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "\\b", "i");
+        if (re.test(t)) score += 1;
+      }
+    }
+    if (score > 0) matched.push({ sector, score });
+  }
+  matched.sort((a,b) => b.score - a.score);
+  return matched.slice(0,3).map(x => x.sector);
+}
+
+function itemMatchesSector(item, sector){
+  // 1. Direct match on item.sector
+  if (item.sector === sector) return true;
+  // 2. Match on item.sectors array (from worker)
+  if (Array.isArray(item.sectors) && item.sectors.includes(sector)) return true;
+  // 3. Client-side keyword inference from headline + keypoints
+  const text = [item.headline, ...(item.keypoints||[])].join(" ");
+  const inferred = clientInferSectors(text);
+  return inferred.includes(sector);
+}
+
 function normalizeData(raw){
   const d = raw || {};
   d.generatedAt = d.generatedAt || d.generated_at_wib || d.generated_at || null;
@@ -667,18 +746,30 @@ function normalizeData(raw){
   d.livewire = Array.isArray(d.livewire) ? d.livewire : [];
   d.livewire = d.livewire
     .filter(x => x && REGIONS.includes(x.region) && SECTORS.includes(x.sector))
-    .map(x => ({
-      id: String(x.id || ""),
-      region: x.region,
-      sector: x.sector,
-      impact: String(x.impact || "MEDIUM").toUpperCase(),
-      headline: String(x.headline || x.title || "").trim(),
-      keypoints: Array.isArray(x.keypoints) ? x.keypoints.map(String).filter(Boolean).slice(0,3) : [],
-      publishedAt: x.publishedAt || x.published_at || null,
-      sources: Array.isArray(x.sources) ? x.sources : [],
-      story: x.story || x.body || "",
-      category: x.category || null,
-    }))
+    .map(x => {
+      const item = {
+        id: String(x.id || ""),
+        storyKey: x.storyKey || x.id || "",
+        region: x.region,
+        sector: x.sector,
+        sectors: Array.isArray(x.sectors) ? x.sectors : [],
+        impact: String(x.impact || "MEDIUM").toUpperCase(),
+        headline: String(x.headline || x.title || "").trim(),
+        keypoints: Array.isArray(x.keypoints) ? x.keypoints.map(String).filter(Boolean).slice(0,3) : [],
+        publishedAt: x.publishedAt || x.published_at || null,
+        sources: Array.isArray(x.sources) ? x.sources : [],
+        story: x.story || x.body || "",
+        category: x.category || null,
+      };
+      // Enrich with client-side sector inference if sectors[] is empty
+      if (!item.sectors.length || (item.sectors.length === 1 && item.sectors[0] === "GENERAL")) {
+        const inferred = clientInferSectors([item.headline, ...item.keypoints].join(" "));
+        if (inferred.length) {
+          item.sectors = inferred;
+        }
+      }
+      return item;
+    })
     .filter(x => x.headline);
 
   // briefings: region + sector digests
@@ -729,9 +820,10 @@ function renderNav(){
   });
 
   SECTORS.forEach(s => {
+    const count = filteredWire(state.region, s).length;
     const b = document.createElement("button");
     b.className = "navItem" + (state.sector===s ? " active" : "");
-    b.innerHTML = `<span>${esc(SECTOR_META[s])}</span>`;
+    b.innerHTML = `<span>${esc(SECTOR_META[s])}</span><span class="text-xs text-white/40 font-extrabold">${count}</span>`;
     b.onclick = () => { state.sector = s; renderAll(); };
     sn.appendChild(b);
   });
@@ -751,8 +843,15 @@ function filteredWire(region, sector){
   if (sector === "GENERAL") {
     // prefer dedicated general items, otherwise mix all
     const g = arr.filter(x => x.sector==="GENERAL");
-    if (g.length) return g.slice();
-    // Deduplicate by storyKey, pick best version
+    if (g.length) {
+      // Deduplicate by storyKey
+      const seen = new Map();
+      for (const x of g) {
+        const prev = seen.get(x.storyKey);
+        if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
+      }
+      return Array.from(seen.values());
+    }
     const seen = new Map();
     for (const x of arr) {
       const prev = seen.get(x.storyKey);
@@ -765,11 +864,9 @@ function filteredWire(region, sector){
     }).slice(0,18);
   }
 
-  // For specific sectors: check both primary sector AND sectors[] array
-  const matched = arr.filter(x =>
-    x.sector===sector ||
-    (Array.isArray(x.sectors) && x.sectors.includes(sector))
-  );
+  // For specific sectors: use itemMatchesSector which checks
+  // item.sector, item.sectors[], AND client-side keyword inference
+  const matched = arr.filter(x => itemMatchesSector(x, sector));
 
   // Deduplicate by storyKey
   const seen = new Map();
