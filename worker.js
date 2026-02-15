@@ -31,7 +31,7 @@ const RSS_WINDOW_HOURS = Number(process.env.RSS_WINDOW_HOURS || TTL_HOURS);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || ""; // if empty, auto-fallback list
 const GEMINI_MAX_NEW = Number(process.env.GEMINI_MAX_NEW || 14); // max stories rewritten per region per run
-const GEMINI_MAX_TOKENS = Number(process.env.GEMINI_MAX_TOKENS || 2500);
+const GEMINI_MAX_TOKENS = Number(process.env.GEMINI_MAX_TOKENS || 4096);
 const GEMINI_TEMPERATURE = Number(process.env.GEMINI_TEMPERATURE || 0.3);
 
 // Limits
@@ -466,7 +466,122 @@ function canonicalUrl(u) {
   return String(u || "").trim().replace(/&amp;/g, "&");
 }
 
-function makeBaseItem({ region, headline, link, publishedAt, description, sourceName, sourceUrl, hintSector }) {
+// Extract real article URL from Google News RSS <description> HTML.
+// Google News RSS description contains: <a href="https://real-article-url.com/...">headline</a>
+function extractArticleUrlFromDesc(descHtml) {
+  if (!descHtml) return "";
+  const match = String(descHtml).match(/href="([^"]+)"/);
+  if (!match) return "";
+  const url = canonicalUrl(match[1]);
+  // Skip if it's still a Google News URL
+  try {
+    const u = new URL(url);
+    if (u.hostname.endsWith("news.google.com")) return "";
+  } catch { return ""; }
+  return url;
+}
+
+// Fetch article text content from a URL. Returns first ~2000 chars of article body.
+// Uses concurrency-safe timeout and graceful fallback.
+const ARTICLE_FETCH_TIMEOUT = 8000;
+async function fetchArticleText(url) {
+  if (!url) return "";
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,*/*",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timer);
+    if (!res.ok) return "";
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("html") && !contentType.includes("text")) return "";
+    const html = await res.text();
+    return extractTextFromHtml(html);
+  } catch {
+    return "";
+  }
+}
+
+// Extract readable text from HTML article page.
+// Prioritizes <article>, <main>, then falls back to all <p> tags.
+function extractTextFromHtml(html) {
+  if (!html) return "";
+
+  // Try to find article body (most news sites wrap content in <article> or specific divs)
+  let body = "";
+
+  // Strategy 1: Extract from <article>...</article>
+  const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+  if (articleMatch) {
+    body = articleMatch[1];
+  }
+
+  // Strategy 2: If no <article>, try <main>
+  if (!body) {
+    const mainMatch = html.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+    if (mainMatch) body = mainMatch[1];
+  }
+
+  // Strategy 3: fall back to full HTML
+  if (!body) body = html;
+
+  // Extract text from <p> tags only (most reliable for article content)
+  const paragraphs = [];
+  const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  let m;
+  while ((m = pRegex.exec(body)) !== null) {
+    const text = stripHtml(m[1]).trim();
+    // Filter out very short paragraphs (nav items, captions) and very long ones (embedded data)
+    if (text.length >= 40 && text.length < 3000) {
+      paragraphs.push(text);
+    }
+  }
+
+  if (!paragraphs.length) return "";
+
+  // Join paragraphs and limit to ~2000 chars
+  let result = paragraphs.join("\n\n");
+  if (result.length > 2000) result = result.slice(0, 2000);
+  return result;
+}
+
+// Enrich items with real article URLs and content, with concurrency control.
+const ARTICLE_CONCURRENCY = 5;
+async function enrichItemsWithArticleContent(items) {
+  const results = new Array(items.length);
+
+  // Process in batches of ARTICLE_CONCURRENCY
+  for (let i = 0; i < items.length; i += ARTICLE_CONCURRENCY) {
+    const batch = items.slice(i, i + ARTICLE_CONCURRENCY);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (item) => {
+        const articleUrl = item.articleUrl || item.sources?.[0]?.url || "";
+        if (!articleUrl) return { articleText: "" };
+        const text = await fetchArticleText(articleUrl);
+        return { articleText: text };
+      })
+    );
+
+    for (let j = 0; j < batchResults.length; j++) {
+      const idx = i + j;
+      if (batchResults[j].status === "fulfilled" && batchResults[j].value.articleText) {
+        results[idx] = batchResults[j].value.articleText;
+      } else {
+        results[idx] = "";
+      }
+    }
+  }
+
+  return results;
+}
+
+function makeBaseItem({ region, headline, link, publishedAt, description, sourceName, sourceUrl, articleUrl, hintSector }) {
   const url = canonicalUrl(sourceUrl || link);
   const storyKey = sha1(`${url}|${headline}`);
   const snippet = cleanText(stripHtml(description || ""));
@@ -505,6 +620,7 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
     story: fallbackStory,
     publishedAt,
     sources: [{ name: cleanText(sourceName || "Source"), url }],
+    articleUrl: canonicalUrl(articleUrl || ""), // real article URL for content fetching
   };
 }
 
@@ -554,14 +670,23 @@ async function fetchRss(url) {
   const items = obj?.rss?.channel?.item;
   if (!items) return [];
   const arr = Array.isArray(items) ? items : [items];
-  return arr.map(it => ({
-    title: cleanText(it.title?.text ?? it.title),
-    link: canonicalUrl(it.link?.text ?? it.link),
-    pubDate: it.pubDate?.text ?? it.pubDate,
-    description: it.description?.text ?? it.description,
-    sourceName: cleanText(it.source?.text ?? it.source),
-    sourceUrl: canonicalUrl(it.source?.url ?? ""),
-  })).filter(x => x.title && x.link);
+  return arr.map(it => {
+    const desc = it.description?.text ?? it.description;
+    const link = canonicalUrl(it.link?.text ?? it.link);
+    // Google News RSS: real article URL is in <a href="..."> inside description HTML
+    const realUrl = extractArticleUrlFromDesc(desc);
+    const rssSourceUrl = canonicalUrl(it.source?.url ?? "");
+    return {
+      title: cleanText(it.title?.text ?? it.title),
+      link,
+      pubDate: it.pubDate?.text ?? it.pubDate,
+      description: desc,
+      sourceName: cleanText(it.source?.text ?? it.source),
+      // Prefer: real article URL from description > RSS source url > Google News redirect link
+      sourceUrl: realUrl || rssSourceUrl || link,
+      articleUrl: realUrl || "", // real article URL for content fetching
+    };
+  }).filter(x => x.title && x.link);
 }
 
 function buildRssUrl(region, q) {
@@ -1001,7 +1126,7 @@ function sanitizeRewritten(base, rewritten) {
   return out;
 }
 
-async function rewriteItemsWithGemini(region, items) {
+async function rewriteItemsWithGemini(region, items, articleTexts = []) {
   if (!ai) return items;
   if (!items.length) return items;
 
@@ -1012,22 +1137,32 @@ async function rewriteItemsWithGemini(region, items) {
     "gemini-1.5-pro",
   ].filter(Boolean);
 
-  const payload = items.map(it => ({
-    storyKey: it.storyKey,
-    headline: it.headline,
-    description: it.keypoints?.join(" ") || "",
-    publishedAt: it.publishedAt,
-    sourceName: it.sources?.[0]?.name || "Source",
-    sourceUrl: it.sources?.[0]?.url || "",
-    suggestedSector: it.sector,
-    suggestedImpact: it.impact,
-  }));
+  const payload = items.map((it, idx) => {
+    const articleText = articleTexts[idx] || "";
+    // Use article text if available, otherwise fall back to keypoints
+    const description = articleText
+      ? articleText.slice(0, 800)
+      : (it.keypoints?.join(" ") || "");
+    return {
+      storyKey: it.storyKey,
+      headline: it.headline,
+      description,
+      hasFullArticle: articleText.length > 100,
+      publishedAt: it.publishedAt,
+      sourceName: it.sources?.[0]?.name || "Source",
+      sourceUrl: it.sources?.[0]?.url || "",
+      suggestedSector: it.sector,
+      suggestedImpact: it.impact,
+    };
+  });
 
   const prompt = `
-Kamu adalah editor pasar finansial. Kamu TIDAK mencari berita; kamu hanya menulis ulang berdasarkan data input.
+Kamu adalah editor pasar finansial. Kamu menulis ulang berita berdasarkan data input.
 Aturan keras:
-- Jangan menambah fakta baru di luar input headline/description.
-- Jangan mengarang angka, kutipan, atau detail yang tidak ada.
+- Gunakan fakta dari headline DAN description (jika tersedia) untuk menulis narasi yang informatif.
+- Jika field "hasFullArticle" true, description berisi konten artikel asli — gunakan untuk membuat narasi yang kaya dan detail.
+- Jika "hasFullArticle" false, description hanya snippet singkat — tulis narasi sebaik mungkin dari yang tersedia.
+- Jangan mengarang angka, kutipan, atau detail yang tidak ada di input.
 - Bahasa Indonesia profesional, singkat, terminal-style.
 - Output valid JSON (tanpa markdown).
 
@@ -1041,8 +1176,8 @@ Untuk setiap item, tulis ulang menjadi objek:
   "headline": "headline yang lebih rapi (maks 110 char)",
   "sector": one of ${JSON.stringify(SECTORS)},
   "impact": "HIGH|MEDIUM|LOW",
-  "keypoints": ["3 poin ringkas"],
-  "story": "narasi 90-140 kata, ringkas, tanpa filler"
+  "keypoints": ["3 poin ringkas yang informatif, bukan copy-paste headline"],
+  "story": "narasi 120-200 kata yang menjelaskan konteks, dampak, dan detail penting berita"
 }
 
 OUTPUT: JSON array (urutan bebas).
@@ -1461,6 +1596,7 @@ async function main() {
         description: x.description,
         sourceName: x.sourceName || "Source",
         sourceUrl: x.sourceUrl || x.link,
+        articleUrl: x.articleUrl || "",
         hintSector: x.hintSector,
       }));
     const afterTrust = allBaseItems.filter(isTrustedItem);
@@ -1498,10 +1634,19 @@ async function main() {
 
     debug.regions[region].rewrite_requested = toRewrite.length;
 
+    // Fetch article content for items that need rewriting
+    let articleTexts = [];
+    if (toRewrite.length) {
+      console.log(`[worker] region=${region} fetching article content for ${toRewrite.length} items...`);
+      articleTexts = await enrichItemsWithArticleContent(toRewrite);
+      const fetchedCount = articleTexts.filter(t => t.length > 0).length;
+      console.log(`[worker] region=${region} fetched article content: ${fetchedCount}/${toRewrite.length} succeeded`);
+    }
+
     let rewritten = toRewrite;
     if (toRewrite.length && ai) {
       console.log(`[worker] region=${region} gemini rewrite count=${toRewrite.length}`);
-      rewritten = await rewriteItemsWithGemini(region, toRewrite);
+      rewritten = await rewriteItemsWithGemini(region, toRewrite, articleTexts);
     }
     debug.regions[region].rewrite_used = rewritten.length;
 
