@@ -824,17 +824,16 @@ function normalizeData(raw){
         story: x.story || x.body || "",
         category: x.category || null,
       };
-      // Enrich with client-side sector inference if sectors[] is empty or only GENERAL
-      if (!item.sectors.length || (item.sectors.length === 1 && item.sectors[0] === "GENERAL")) {
-        const inferText = [item.headline, ...item.keypoints, item.story, item.category].filter(Boolean).join(" ");
-        const inferred = clientInferSectors(inferText);
-        if (inferred.length) {
-          item.sectors = inferred;
-          // Also update primary sector if it was GENERAL
-          if (item.sector === "GENERAL") {
-            item.sector = inferred[0];
-          }
-        }
+      // Enrich item.sectors with client-side inference (for sector filter matching).
+      // IMPORTANT: do NOT change item.sector — it must stay as-is so the GENERAL
+      // view keeps showing all items that were originally tagged GENERAL.
+      const inferText = [item.headline, ...item.keypoints, item.story, item.category].filter(Boolean).join(" ");
+      const inferred = clientInferSectors(inferText);
+      if (inferred.length) {
+        // Merge worker sectors + inferred sectors (deduplicated)
+        const merged = new Set([...item.sectors, ...inferred]);
+        merged.delete("GENERAL"); // remove GENERAL from inferred to keep it meaningful
+        item.sectors = Array.from(merged);
       }
       return item;
     })
@@ -930,24 +929,21 @@ function renderNav(){
 function filteredWire(region, sector){
   const arr = (state.data?.livewire || []).filter(x => x.region===region);
 
-  if (sector === "GENERAL") {
-    // prefer dedicated general items, otherwise mix all
-    const g = arr.filter(x => x.sector==="GENERAL");
-    if (g.length) {
-      // Deduplicate by storyKey
-      const seen = new Map();
-      for (const x of g) {
-        const prev = seen.get(x.storyKey);
-        if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
-      }
-      return Array.from(seen.values());
-    }
+  // Helper: deduplicate by storyKey, keeping the richest version
+  function dedup(items) {
     const seen = new Map();
-    for (const x of arr) {
-      const prev = seen.get(x.storyKey);
-      if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
+    for (const x of items) {
+      const key = x.storyKey || x.id;
+      const prev = seen.get(key);
+      if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(key, x);
     }
-    return Array.from(seen.values()).sort((a,b)=>{
+    return Array.from(seen.values());
+  }
+
+  if (sector === "GENERAL") {
+    // GENERAL = aggregated view of ALL items for the region, deduplicated
+    const all = dedup(arr);
+    return all.sort((a,b) => {
       const ia=impactRank(a.impact), ib=impactRank(b.impact);
       if (ia!==ib) return ib-ia;
       return (safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0);
@@ -957,14 +953,7 @@ function filteredWire(region, sector){
   // For specific sectors: use itemMatchesSector which checks
   // item.sector, item.sectors[], AND client-side keyword inference
   const matched = arr.filter(x => itemMatchesSector(x, sector));
-
-  // Deduplicate by storyKey
-  const seen = new Map();
-  for (const x of matched) {
-    const prev = seen.get(x.storyKey);
-    if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
-  }
-  return Array.from(seen.values());
+  return dedup(matched);
 }
 
 function getDigest(region, sector){
@@ -1098,7 +1087,16 @@ function renderWire(){
   grid.innerHTML = "";
 
   if (!items.length) {
-    el("wireEmpty").classList.remove("hidden");
+    const totalRegion = (state.data?.livewire || []).filter(x => x.region===region).length;
+    const emptyEl = el("wireEmpty");
+    if (totalRegion === 0) {
+      emptyEl.textContent = `Belum ada berita untuk ${REGION_META[region].label}. Data akan diperbarui saat worker berikutnya berjalan.`;
+    } else if (sector !== "GENERAL") {
+      emptyEl.textContent = `Tidak ada berita ${SECTOR_META[sector]} untuk ${REGION_META[region].label} dalam 24 jam terakhir. (${totalRegion} berita tersedia di Umum)`;
+    } else {
+      emptyEl.textContent = "Tidak ada update signifikan ≤24 jam.";
+    }
+    emptyEl.classList.remove("hidden");
     return;
   }
   el("wireEmpty").classList.add("hidden");
