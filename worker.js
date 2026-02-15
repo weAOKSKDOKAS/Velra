@@ -65,51 +65,77 @@ const MORNING_RELEASE_HOUR = {
 const RSS_CFG = {
   INDONESIA: {
     hl: "id", gl: "ID", ceid: "ID:id",
-    baseQ: "(Indonesia) (IHSG OR IDX OR Bursa Efek Indonesia OR saham OR rupiah OR Bank Indonesia OR OJK)",
-    anchor: "(Indonesia OR IHSG OR IDX OR rupiah OR \"Bank Indonesia\" OR OJK)"
+    baseQ: "Indonesia (ekonomi OR bisnis OR keuangan OR saham OR IHSG OR rupiah OR investasi OR pasar)",
+    anchor: "(Indonesia OR IHSG OR IDX OR rupiah OR saham OR bisnis OR ekonomi)"
   },
   USA: {
     hl: "en", gl: "US", ceid: "US:en",
-    baseQ: "(US OR \"Wall Street\") (stocks OR S&P 500 OR Nasdaq OR Fed OR \"Treasury yields\" OR earnings)",
-    anchor: "(US OR \"Wall Street\" OR S&P OR Nasdaq OR Fed OR \"Treasury\")"
+    baseQ: "(economy OR stocks OR markets OR earnings OR Fed OR inflation OR \"Wall Street\" OR business)",
+    anchor: "(US OR American OR \"Wall Street\" OR economy OR market OR business)"
   },
   ASIA: {
     hl: "en", gl: "HK", ceid: "HK:en",
-    baseQ: "(Asia OR China OR Japan OR Korea OR Hong Kong) (stocks OR markets OR Nikkei OR Hang Seng OR Shanghai OR Kospi)",
-    anchor: "(Asia OR China OR Japan OR Korea OR \"Hong Kong\" OR Nikkei OR \"Hang Seng\" OR Shanghai OR Kospi)"
+    baseQ: "(Asia OR China OR Japan OR Korea OR India OR \"Hong Kong\" OR Taiwan) (economy OR stocks OR markets OR trade OR business)",
+    anchor: "(Asia OR China OR Japan OR Korea OR India OR \"Hong Kong\" OR Taiwan OR ASEAN)"
   },
   EUROPE: {
     hl: "en", gl: "GB", ceid: "GB:en",
-    baseQ: "(Europe OR EU OR UK) (stocks OR markets OR ECB OR FTSE OR DAX OR CAC OR MIB OR IBEX)",
-    anchor: "(Europe OR EU OR UK OR ECB OR FTSE OR DAX OR CAC OR MIB OR IBEX)"
+    baseQ: "(Europe OR EU OR UK OR Germany OR France) (economy OR stocks OR markets OR ECB OR business OR trade)",
+    anchor: "(Europe OR EU OR UK OR Germany OR France OR ECB OR FTSE)"
   },
 };
 
 const SECTOR_RSS_HINTS = {
-  TECHNOLOGY: '(tech OR technology OR teknologi OR AI OR "artificial intelligence" OR semiconductor OR chip OR GPU OR cloud OR software OR cybersecurity OR "data breach")',
-  FINANCE: '(bank OR banking OR perbankan OR lender OR "central bank" OR Fed OR ECB OR BoJ OR "interest rate" OR rate OR yield OR bond OR obligasi OR treasury OR stocks OR shares OR equity OR "stock market" OR bursa OR IHSG OR IDX OR "S&P 500" OR Nasdaq OR Wall Street OR rupiah OR "USD/IDR")',
-  MINING_ENERGY: '(oil OR crude OR Brent OR WTI OR gas OR LNG OR OPEC OR coal OR batubara OR mining OR tambang OR nickel OR nikel OR copper OR tembaga OR gold OR emas OR silver OR perak OR "energy sector")',
-  HEALTHCARE: '(health OR healthcare OR kesehatan OR hospital OR rumahsakit OR pharma OR farmasi OR drug OR obat OR vaccine OR vaksin OR biotech OR BPJS)',
-  REGULATION: '(regulation OR regulasi OR regulator OR policy OR kebijakan OR law OR "undang-undang" OR tariff OR tarif OR tax OR pajak OR sanction OR sanksi OR ban OR larangan OR antitrust OR SEC OR DOJ OR FTC OR OJK)',
-  CONSUMER: '(consumer OR konsumen OR retail OR ritel OR "consumer goods" OR FMCG OR "e-commerce" OR ecommerce OR travel OR tourism OR airline OR maskapai OR hotel OR restaurant OR makanan OR minuman OR "spending" OR penjualan OR sales)',
+  TECHNOLOGY: '(tech OR technology OR teknologi OR AI OR "artificial intelligence" OR semiconductor OR chip OR GPU OR cloud OR software OR cybersecurity OR Apple OR Google OR Microsoft OR Nvidia OR startup OR digital OR robot)',
+  FINANCE: '(bank OR banking OR "central bank" OR Fed OR ECB OR "interest rate" OR yield OR bond OR treasury OR stocks OR shares OR "stock market" OR earnings OR profit OR IPO OR forex OR currency OR inflation OR recession OR "Wall Street" OR investor)',
+  MINING_ENERGY: '(oil OR crude OR Brent OR WTI OR OPEC OR gas OR LNG OR energy OR coal OR mining OR nickel OR copper OR gold OR silver OR lithium OR battery OR renewable OR solar OR "electric vehicle" OR EV)',
+  HEALTHCARE: '(health OR healthcare OR hospital OR pharma OR pharmaceutical OR drug OR vaccine OR biotech OR medical OR FDA OR WHO OR pandemic OR cancer OR clinical OR "public health")',
+  REGULATION: '(regulation OR policy OR law OR tariff OR tax OR sanction OR ban OR antitrust OR SEC OR DOJ OR FTC OR government OR legislation OR ruling OR "trade war" OR embargo OR compliance)',
+  CONSUMER: '(consumer OR retail OR "e-commerce" OR ecommerce OR travel OR tourism OR airline OR hotel OR restaurant OR food OR automotive OR car OR "consumer spending" OR sales OR shopping OR luxury)',
 };
 
-// Basic allowlist. We rely on RSS source URLs; some are paywalled, but at least it's reputable.
+// Allowlist for source domains. Google News RSS is the primary feed, and it already
+// curates reputable sources. This list is a SUPPLEMENT, not a gate — see isTrustedItem.
 const TRUSTED_DOMAINS = [
-  "reuters.com", "cnbc.com", "cnbcindonesia.com", "bloomberg.com", "wsj.com", "ft.com",
-  "marketwatch.com", "finance.yahoo.com", "investing.com", "theedgemarkets.com",
-  "bisnis.com", "kontan.co.id", "kompas.com", "cnn.com", "nikkei.com", "scmp.com",
-  "asia.nikkei.com", "apnews.com", "theguardian.com", "bbc.co.uk", "bbc.com",
-  // Indonesia (high-traffic, generally reputable)
-  "detik.com", "tempo.co", "katadata.co.id", "antaranews.com", "thejakartapost.com", "jakartaglobe.id",
-  "investor.id", "republika.co.id",
-  // Global business / markets
-  "barrons.com", "forbes.com", "fortune.com", "businessinsider.com", "economist.com",
-  "cbsnews.com", "nbcnews.com", "abcnews.go.com", "aljazeera.com",
-  // Crypto / tech markets (optional but common)
-  "coindesk.com", "cointelegraph.com",
-  // Data & calendars
-  "tradingeconomics.com", "tradingview.com"
+  // === Wire services & top-tier global ===
+  "reuters.com", "apnews.com", "bloomberg.com", "wsj.com", "ft.com", "economist.com",
+  "nytimes.com", "washingtonpost.com",
+  // === US business / markets ===
+  "cnbc.com", "marketwatch.com", "finance.yahoo.com", "investing.com", "barrons.com",
+  "forbes.com", "fortune.com", "businessinsider.com", "insider.com", "benzinga.com",
+  "seekingalpha.com", "fool.com", "thestreet.com", "zacks.com",
+  // === US general ===
+  "cnn.com", "cbsnews.com", "nbcnews.com", "abcnews.go.com", "foxbusiness.com",
+  "npr.org", "politico.com", "axios.com", "semafor.com", "vox.com",
+  // === Tech ===
+  "techcrunch.com", "theverge.com", "wired.com", "arstechnica.com", "engadget.com",
+  "zdnet.com", "cnet.com", "thenextweb.com", "venturebeat.com", "protocol.com",
+  "tomshardware.com", "theinformation.com",
+  // === UK / Europe ===
+  "theguardian.com", "bbc.co.uk", "bbc.com", "telegraph.co.uk", "independent.co.uk",
+  "sky.com", "skynews.com.au", "euronews.com", "dw.com", "france24.com", "politico.eu",
+  // === Asia-Pacific ===
+  "nikkei.com", "asia.nikkei.com", "scmp.com", "straitstimes.com", "channelnewsasia.com",
+  "bangkokpost.com", "japantimes.co.jp", "koreaherald.com", "koreatimes.co.kr",
+  "theedgemarkets.com", "thestar.com.my", "inquirer.net", "rappler.com",
+  "livemint.com", "economictimes.indiatimes.com", "moneycontrol.com", "ndtv.com",
+  "abc.net.au", "afr.com", "smh.com.au",
+  // === Middle East / Africa ===
+  "aljazeera.com", "arabnews.com", "gulfnews.com", "thenationalnews.com",
+  // === Indonesia ===
+  "cnbcindonesia.com", "bisnis.com", "kontan.co.id", "kompas.com", "kompas.id",
+  "detik.com", "tempo.co", "katadata.co.id", "antaranews.com", "thejakartapost.com",
+  "jakartaglobe.id", "investor.id", "republika.co.id", "idnfinancials.com",
+  "tirto.id", "kumparan.com", "suara.com", "medcom.id", "liputan6.com",
+  "okezone.com", "merdeka.com", "viva.co.id", "iNews.id",
+  // === Crypto / fintech ===
+  "coindesk.com", "cointelegraph.com", "theblock.co", "decrypt.co",
+  // === Data & calendars ===
+  "tradingeconomics.com", "tradingview.com",
+  // === Energy / commodities ===
+  "oilprice.com", "rigzone.com", "spglobal.com", "mining.com", "kitco.com",
+  // === Healthcare ===
+  "statnews.com", "fiercepharma.com", "medscape.com",
 ];
 
 // -------- UTIL --------
@@ -172,12 +198,34 @@ function isTrustedUrl(urlStr) {
 }
 
 const TRUSTED_SOURCE_NAME_HINTS = [
+  // Wire / top-tier
   "reuters","bloomberg","cnbc","financial times","ft.com","wall street journal","wsj","marketwatch",
-  "the economist","nikkei","associated press","ap news","the verge","techcrunch",
-  "kompas","bisnis indonesia","kontan","cnbc indonesia","tempo","antara","katadata",
-  "the jakarta post","jakarta post","detik","tirto","kumparan",
-  "the guardian","bbc","sky news","al jazeera","yahoo finance","investing.com",
-  "barron's","forbes","fortune","semafor","axios"
+  "the economist","nikkei","associated press","ap news","ap",
+  // US business
+  "barron","forbes","fortune","semafor","axios","benzinga","seeking alpha","motley fool",
+  "the street","business insider","insider","fox business","yahoo finance","investing.com",
+  // US general
+  "cnn","nbc","abc news","cbs","npr","politico","vox","new york times","washington post",
+  // Tech
+  "the verge","techcrunch","wired","ars technica","engadget","zdnet","cnet","venturebeat",
+  // UK/Europe
+  "the guardian","bbc","sky news","telegraph","euronews","dw","france24","france 24","politico eu",
+  // Asia-Pacific
+  "nikkei asia","south china morning post","scmp","straits times","channel news asia","cna",
+  "bangkok post","japan times","korea herald","korea times","the edge",
+  "the star","inquirer","rappler","livemint","economic times","moneycontrol","ndtv",
+  // Middle East
+  "al jazeera","arab news","gulf news",
+  // Indonesia
+  "kompas","bisnis indonesia","bisnis.com","kontan","cnbc indonesia","tempo","antara","katadata",
+  "the jakarta post","jakarta post","detik","tirto","kumparan","investor","republika",
+  "liputan6","okezone","medcom","merdeka","suara","inews","idn","idnfinancials",
+  // Energy / commodities
+  "oilprice","oil price","rigzone","s&p global","kitco","mining.com",
+  // Healthcare
+  "stat news","statnews","fierce pharma","medscape",
+  // Crypto
+  "coindesk","cointelegraph","the block","decrypt",
 ];
 
 function isTrustedSourceName(name) {
@@ -186,9 +234,31 @@ function isTrustedSourceName(name) {
   return TRUSTED_SOURCE_NAME_HINTS.some(h => n.includes(h));
 }
 
+// Spam / low-quality domains to explicitly reject even from Google News
+const BLOCKED_DOMAINS = [
+  "blogspot.com", "wordpress.com", "medium.com", "substack.com",
+  "reddit.com", "twitter.com", "x.com", "facebook.com", "tiktok.com",
+  "pinterest.com", "quora.com",
+];
+
+function isBlockedUrl(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    return BLOCKED_DOMAINS.some(d => u.hostname.endsWith(d));
+  } catch { return false; }
+}
+
 function isTrustedItem(item) {
   const sources = Array.isArray(item?.sources) ? item.sources : [];
-  // Prefer trusting the publisher URL (non-google) if present
+  const primaryUrl = sources[0]?.url || "";
+  const primaryName = sources[0]?.name || "";
+
+  // Reject explicitly blocked domains
+  for (const s of sources) {
+    if (isBlockedUrl(s?.url || "")) return false;
+  }
+
+  // Trust items from known reputable domains
   for (const s of sources) {
     const url = s?.url || "";
     try {
@@ -196,16 +266,20 @@ function isTrustedItem(item) {
       if (!u.hostname.endsWith("news.google.com") && isTrustedUrl(url)) return true;
     } catch {}
   }
-  // Fall back to source name allowlist (useful when RSS provides weird tracking URLs)
-  const primaryName = sources[0]?.name || "";
+
+  // Trust items with a recognized source name
   if (isTrustedSourceName(primaryName)) return true;
 
-  // If the only URL we have is the Google wrapper, require a trusted source name.
-  const primaryUrl = sources[0]?.url || "";
+  // Google News RSS already curates reputable sources. If item comes from
+  // Google News and has ANY source name, trust it. This dramatically increases
+  // coverage for legitimate outlets not in our allowlist.
   try {
     const u = new URL(primaryUrl);
-    if (u.hostname.endsWith("news.google.com")) return isTrustedSourceName(primaryName);
+    if (u.hostname.endsWith("news.google.com") && primaryName && primaryName.length > 1) return true;
   } catch {}
+
+  // Accept any item that has a real publisher URL (not Google redirect) with a source name
+  if (primaryName && primaryName.length > 1 && primaryUrl) return true;
 
   return false;
 }
@@ -221,47 +295,77 @@ function impactRank(v) {
 
 const SECTOR_KEYWORDS = {
   TECHNOLOGY: [
-    "tech","technology","teknologi","ai","artificial intelligence","kecerdasan buatan",
-    "semiconductor","semikonduktor","chip","gpu","nvidia","amd","tsmc",
-    "software","saas","cloud","aws","azure","gcp","cybersecurity","ransomware","data breach",
-    "smartphone","iphone","android","telecom","5g","internet","startup","venture","vc",
-    "robot","automation","quantum","openai","gemini","anthropic"
+    "tech","technology","teknologi","digital","digitalisasi",
+    "ai","artificial intelligence","kecerdasan buatan","machine learning","deep learning",
+    "semiconductor","semikonduktor","chip","chipset","gpu","cpu","nvidia","amd","tsmc","intel","qualcomm","broadcom","asml",
+    "software","saas","cloud","aws","azure","gcp","cybersecurity","ransomware","data breach","siber",
+    "smartphone","iphone","android","handphone","gadget","telecom","telekomunikasi","telkom","indosat","5g","internet",
+    "startup","venture","unicorn","fintech","edtech",
+    "robot","robotik","automation","otomasi","quantum","computing",
+    "openai","chatgpt","gemini","anthropic","meta","google","apple","microsoft","amazon","samsung","sony",
+    "aplikasi","platform","blockchain","crypto","bitcoin","ethereum","kripto",
+    "streaming","netflix","tiktok","gopay","dana","ovo","tokopedia"
   ],
   FINANCE: [
-    "bank","banking","perbankan","lender","loan","kredit","mortgage","hipotek","deposit","savings",
-    "central bank","bank sentral","fed","fomc","ecb","boj","bi","bank indonesia","ojk","fdic",
-    "interest rate","suku bunga","rate cut","rate hike","yield","yields","bond","bonds","obligasi","treasury","t-bill",
-    "inflation","cpi","ppi","unemployment","nfp","gdp","growth","resesi","recession",
-    "fx","forex","currency","dollar","usd","eur","jpy","rupiah","idr","usd/idr","dxy",
-    "stocks","stock","shares","equity","equities","index","indices","bursa","ihsg","idx","nasdaq","s&p","dow","wall street",
-    "trading","sell-off","rally","market","markets","risk-on","risk-off","capital flow","outflow","inflow",
-    "earnings","profit","laba","guidance","dividend","buyback","ipo"
+    "bank","banking","perbankan","keuangan","finansial","financial",
+    "bca","bri","bni","mandiri","bsi","cimb","bbca","bbri","bbni","bmri",
+    "central bank","bank sentral","fed","fomc","ecb","boj","boe","rba","pboc","bi rate",
+    "bank indonesia","ojk","fdic",
+    "interest rate","suku bunga","rate cut","rate hike","dovish","hawkish",
+    "yield","yields","bond","bonds","obligasi","treasury","t-bill","sbn","sukuk",
+    "inflation","inflasi","deflasi","cpi","ppi","unemployment","nfp","gdp","pdb","growth","resesi","recession",
+    "fx","forex","currency","mata uang","dollar","dolar","usd","eur","jpy","rupiah","idr","usd/idr","dxy","valas",
+    "saham","stocks","stock","shares","equity","equities","investasi","investment","investor","reksadana",
+    "index","indices","indeks","bursa","ihsg","idx","lq45","nasdaq","s&p","dow","wall street","nikkei","hang seng","kospi",
+    "trading","perdagangan","sell-off","rally","bullish","bearish","koreksi","correction",
+    "market","markets","pasar","pasar modal","risk-on","risk-off","capital flow","outflow","inflow",
+    "asing","foreign","net buy","net sell",
+    "earnings","profit","laba","rugi","loss","pendapatan","revenue","guidance","dividend","dividen","buyback","ipo","rights issue",
+    "asuransi","insurance","leasing","pinjaman","kredit","loan","mortgage"
   ],
   MINING_ENERGY: [
-    "oil","crude","brent","wti","opec","gas","lng","natural gas","diesel","fuel","bbm",
-    "energy","energi","power","electricity","listrik","utility","utilities",
-    "coal","batubara","mining","tambang","minerals","mineral","smelter","refinery",
-    "nickel","nikel","copper","tembaga","tin","timah","bauxite","bauksit",
-    "gold","emas","silver","perak","platinum","palladium",
-    "ev","electric vehicle","baterai","battery","lithium","rare earth"
+    "oil","crude","brent","wti","opec","opec+","minyak","minyak mentah",
+    "gas","lng","natural gas","gas alam","diesel","fuel","bbm","pertamina",
+    "energy","energi","power","electricity","listrik","pln","utility","utilities",
+    "ebt","renewable","terbarukan","solar","wind","geothermal",
+    "coal","batubara","batu bara","adaro","itmg","ptba",
+    "mining","tambang","pertambangan","minerals","mineral","smelter","hilirisasi","refinery",
+    "nickel","nikel","copper","tembaga","tin","timah","bauxite","bauksit","aluminium",
+    "gold","emas","silver","perak","platinum","palladium","antam",
+    "ev","electric vehicle","kendaraan listrik","baterai","battery","lithium","rare earth","cobalt",
+    "freeport","vale","bukit asam","medco"
   ],
   HEALTHCARE: [
-    "health","healthcare","kesehatan","hospital","rumahsakit","clinic","klinik",
-    "pharma","farmasi","drug","obat","vaccine","vaksin","biotech","biotek",
-    "medical","medis","doctor","dokter","nurse","perawat","bpjs","insurance health","asuransi kesehatan"
+    "health","healthcare","kesehatan","hospital","rumah sakit","rumahsakit","clinic","klinik",
+    "pharma","pharmaceutical","farmasi","drug","obat","vaccine","vaksin","biotech","biotek","bioteknologi",
+    "medical","medis","kedokteran","doctor","dokter","nurse","perawat","bpjs","jkn",
+    "kalbe","kimia farma","bio farma","indofarma",
+    "who","pandemic","pandemi","endemic","outbreak","wabah","virus","covid",
+    "fda","bpom","clinical trial","uji klinis",
+    "cancer","kanker","disease","penyakit","asuransi kesehatan","insurance health"
   ],
   REGULATION: [
-    "regulation","regulasi","regulator","policy","kebijakan","law","undang-undang","peraturan",
-    "sanction","sanksi","ban","larangan","tariff","tarif","tax","pajak","subsidy","subsidi",
-    "antitrust","competition","monopoly","probe","investigation","penyelidikan",
-    "sec","doj","ftc","eu commission","ojk","bappebti","kppu","kemenkeu","kementerian keuangan"
+    "regulation","regulasi","regulator","policy","kebijakan","law","hukum","undang-undang","peraturan",
+    "government","pemerintah","kementerian","ministry",
+    "sanction","sanksi","embargo","ban","larangan","tariff","tarif","bea masuk",
+    "tax","pajak","ppn","pph","cukai","fiskal","fiscal","apbn","budget",
+    "subsidy","subsidi","insentif","incentive","stimulus",
+    "antitrust","competition","monopoly","persaingan","merger","akuisisi","acquisition",
+    "probe","investigation","penyelidikan","korupsi","corruption","kpk",
+    "sec","doj","ftc","eu commission","ojk","bappebti","kppu","kemenkeu","kementerian keuangan",
+    "dpr","presiden","president","menteri","minister",
+    "election","pemilu","geopolitik","geopolitical","trade war","perang dagang",
+    "ruling","verdict","putusan","court","pengadilan"
   ],
   CONSUMER: [
     "consumer","konsumen","retail","ritel","fmcg","consumer goods","e-commerce","ecommerce","marketplace",
-    "shopping","belanja","sales","penjualan","spending","pengeluaran",
-    "travel","tourism","pariwisata","airline","maskapai","hotel","restaurant","restoran",
-    "food","makanan","beverage","minuman","grocery","supermarket",
-    "automotive","otomotif","car","mobil","motorcycle","motor","ride-hailing","gojek","grab"
+    "shopping","belanja","sales","penjualan","spending","pengeluaran","konsumsi","daya beli",
+    "travel","tourism","pariwisata","wisata","airline","maskapai","garuda","hotel","restaurant","restoran",
+    "food","makanan","beverage","minuman","grocery","supermarket","indomaret","alfamart",
+    "unilever","indofood","mayora",
+    "automotive","otomotif","car","mobil","motorcycle","motor","toyota","honda","astra",
+    "ride-hailing","gojek","grab","shopee","traveloka","lazada",
+    "properti","property","real estate","luxury","fashion"
   ],
 };
 
@@ -470,6 +574,42 @@ function buildRssUrl(region, q) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${cfg.hl}&gl=${cfg.gl}&ceid=${cfg.ceid}`;
 }
 
+// Extra broad queries per region to increase discovery volume
+const EXTRA_QUERIES = {
+  INDONESIA: [
+    { q: "Indonesia saham pasar modal IHSG investasi", hintSector: "FINANCE" },
+    { q: "Indonesia teknologi startup digital", hintSector: "TECHNOLOGY" },
+    { q: "Indonesia tambang energi minyak batubara nikel", hintSector: "MINING_ENERGY" },
+    { q: "Indonesia regulasi pajak pemerintah kebijakan", hintSector: "REGULATION" },
+    { q: "Indonesia konsumen retail otomotif e-commerce", hintSector: "CONSUMER" },
+  ],
+  USA: [
+    { q: "US technology AI semiconductor Apple Google Nvidia", hintSector: "TECHNOLOGY" },
+    { q: "US oil energy renewable electric vehicle", hintSector: "MINING_ENERGY" },
+    { q: "US healthcare pharma FDA biotech drug", hintSector: "HEALTHCARE" },
+    { q: "US regulation SEC antitrust tariff trade policy", hintSector: "REGULATION" },
+    { q: "US consumer retail Amazon spending travel", hintSector: "CONSUMER" },
+  ],
+  ASIA: [
+    { q: "Asia China Japan Korea technology semiconductor AI", hintSector: "TECHNOLOGY" },
+    { q: "Asia China Japan Korea bank finance stock market", hintSector: "FINANCE" },
+    { q: "Asia China oil energy mining commodities", hintSector: "MINING_ENERGY" },
+    { q: "Asia China Japan regulation trade tariff policy", hintSector: "REGULATION" },
+    { q: "Asia China Japan consumer retail travel tourism", hintSector: "CONSUMER" },
+    { q: "China economy trade exports manufacturing", hintSector: "GENERAL" },
+    { q: "Japan economy BOJ yen Nikkei", hintSector: "GENERAL" },
+    { q: "India economy market Sensex Nifty RBI", hintSector: "GENERAL" },
+  ],
+  EUROPE: [
+    { q: "Europe EU technology AI semiconductor", hintSector: "TECHNOLOGY" },
+    { q: "Europe EU oil energy gas renewable", hintSector: "MINING_ENERGY" },
+    { q: "Europe EU healthcare pharma drug", hintSector: "HEALTHCARE" },
+    { q: "Europe EU consumer retail luxury automotive", hintSector: "CONSUMER" },
+    { q: "UK economy Bank of England pound FTSE", hintSector: "GENERAL" },
+    { q: "Germany economy DAX industry manufacturing", hintSector: "GENERAL" },
+  ],
+};
+
 async function gatherRegionNews(region) {
   const cfg = RSS_CFG[region] || { baseQ: region, anchor: region };
   const base = cfg.baseQ || region;
@@ -478,6 +618,7 @@ async function gatherRegionNews(region) {
   // Discovery strategy:
   // - GENERAL feed: broad market query (baseQ)
   // - Sector feeds: (anchor) AND (sector hints) to force sector coverage.
+  // - Extra feeds: broader standalone queries for each sector.
   // This avoids the classic failure where everything collapses into GENERAL.
   const queries = [
     { q: base, hintSector: "GENERAL" },
@@ -485,6 +626,7 @@ async function gatherRegionNews(region) {
       q: `(${anchor}) ${q}`,
       hintSector: sector
     })),
+    ...(EXTRA_QUERIES[region] || []),
   ];
 
   const jobs = queries.map(({ q, hintSector }) => ({
@@ -1310,7 +1452,7 @@ async function main() {
     };
 
     const now = new Date();
-    const freshBase = rssItems
+    const allBaseItems = rssItems
       .map(x => makeBaseItem({
         region,
         headline: x.title,
@@ -1320,9 +1462,10 @@ async function main() {
         sourceName: x.sourceName || "Source",
         sourceUrl: x.sourceUrl || x.link,
         hintSector: x.hintSector,
-      }))
-      .filter(isTrustedItem)
-      .filter(x => withinHours(x.publishedAt, TTL_HOURS, now));
+      }));
+    const afterTrust = allBaseItems.filter(isTrustedItem);
+    const freshBase = afterTrust.filter(x => withinHours(x.publishedAt, TTL_HOURS, now));
+    console.log(`[worker] region=${region} pipeline: rss=${rssItems.length} → base=${allBaseItems.length} → trust=${afterTrust.length} → ttl=${freshBase.length}`);
 
     // distribution after trust+TTL filter
     const baseBySector = {};
