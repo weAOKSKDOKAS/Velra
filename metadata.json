@@ -1,0 +1,5 @@
+{
+  "name": "Velra Terminal",
+  "description": "A real-time, professional financial news terminal focusing on the Indonesian (IHSG) and US markets, featuring AI-driven market outlooks and sector-specific live updates.",
+  "requestFramePermissions": []
+}

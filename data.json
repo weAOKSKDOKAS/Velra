@@ -1,0 +1,204 @@
+{
+  "schema_version": 2,
+  "generatedAt": "2026-02-01T06:10:35.362421Z",
+  "generated_at_wib": "2026-02-01T06:10:35.362444Z",
+  "status": {
+    "ok": true,
+    "note": "sample placeholder - run worker to refresh"
+  },
+  "indices": {
+    "INDONESIA": [],
+    "USA": [],
+    "ASIA": [],
+    "EUROPE": []
+  },
+  "indicators": {
+    "INDONESIA": [],
+    "USA": [],
+    "ASIA": [],
+    "EUROPE": []
+  },
+  "livewire": [],
+  "briefings": {
+    "regions": {
+      "INDONESIA": {
+        "GENERAL": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "TECHNOLOGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "FINANCE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "MINING_ENERGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "HEALTHCARE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "REGULATION": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "CONSUMER": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        }
+      },
+      "USA": {
+        "GENERAL": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "TECHNOLOGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "FINANCE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "MINING_ENERGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "HEALTHCARE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "REGULATION": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "CONSUMER": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        }
+      },
+      "ASIA": {
+        "GENERAL": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "TECHNOLOGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "FINANCE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "MINING_ENERGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "HEALTHCARE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "REGULATION": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "CONSUMER": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        }
+      },
+      "EUROPE": {
+        "GENERAL": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "TECHNOLOGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "FINANCE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "MINING_ENERGY": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "HEALTHCARE": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "REGULATION": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        },
+        "CONSUMER": {
+          "title": "",
+          "bullets": [],
+          "watchlist": [],
+          "updatedAt": null
+        }
+      }
+    }
+  },
+  "morningBriefs": {},
+  "mbMeta": {}
+}

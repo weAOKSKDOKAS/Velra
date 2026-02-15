@@ -1,0 +1,15 @@
+{
+  "name": "velra-terminal",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "worker": "node worker.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "@google-cloud/storage": "^7.16.0",
+    "@google/genai": "latest",
+    "fast-xml-parser": "^4.5.3"
+  }
+}
