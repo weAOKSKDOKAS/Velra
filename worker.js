@@ -137,11 +137,27 @@ function withinHours(d, h, now = new Date()) {
 }
 
 function cleanText(s) {
-  return String(s || "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return String(s || "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\u00A0/g, " ")   // non-breaking space unicode
+    .replace(/&#160;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stripHtml(s) {
-  return String(s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return String(s || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\u00A0/g, " ")
+    .replace(/&#160;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isTrustedUrl(urlStr) {
@@ -350,11 +366,29 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
   const url = canonicalUrl(sourceUrl || link);
   const storyKey = sha1(`${url}|${headline}`);
   const snippet = cleanText(stripHtml(description || ""));
-  // Keep a lightweight fallback story so UI is never empty just because LLM is down.
-  const fallbackStory = snippet ? snippet.slice(0, 650) : "";
+  const cleanHeadline = cleanText(headline);
+
+  // Build a meaningful fallback story from keypoints + description
+  const kp = fallbackKeypoints(description);
+  let fallbackStory = "";
+  if (kp.length) {
+    fallbackStory = kp.join(". ");
+    if (!fallbackStory.endsWith(".")) fallbackStory += ".";
+  } else if (snippet && snippet.toLowerCase() !== cleanHeadline.toLowerCase()) {
+    fallbackStory = snippet.slice(0, 650);
+  }
+
   const hinted = (hintSector && SECTORS.includes(String(hintSector).toUpperCase())) ? String(hintSector).toUpperCase() : null;
-  let sectors = inferSectors(`${headline} ${description || ""}`);
+
+  let sectors;
+  try {
+    sectors = inferSectors(`${headline} ${description || ""}`);
+  } catch {
+    sectors = hinted && hinted !== "GENERAL" ? [hinted] : ["GENERAL"];
+  }
+
   if (hinted && hinted !== "GENERAL") sectors = Array.from(new Set([hinted, ...sectors]));
+
   return {
     id: `${storyKey}:${region}`,
     storyKey,
@@ -362,8 +396,8 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
     sector: (hinted && hinted !== "GENERAL") ? hinted : (sectors && sectors.length ? sectors[0] : "GENERAL"),
     sectors: (sectors && sectors.length ? sectors : undefined),
     impact: inferImpact(`${headline} ${description || ""}`),
-    headline: cleanText(headline),
-    keypoints: fallbackKeypoints(description),
+    headline: cleanHeadline,
+    keypoints: kp,
     story: fallbackStory,
     publishedAt,
     sources: [{ name: cleanText(sourceName || "Source"), url }],
@@ -529,7 +563,14 @@ const REGION_CCY = {
 const MACRO_KEYWORDS = [
   "Non-Farm", "NFP", "Unemployment", "CPI", "PPI", "GDP", "Retail Sales",
   "PMI", "Manufacturing", "Services", "Fed", "FOMC", "Rate", "Interest",
-  "Core", "Inflation", "Payroll", "Jobless", "Confidence", "Trade Balance"
+  "Core", "Inflation", "Payroll", "Jobless", "Confidence", "Trade Balance",
+  "JOLTS", "ISM", "Housing", "Consumer", "Industrial", "Durable",
+  "Personal Income", "Personal Spending", "PCE", "Employment",
+  "Nonfarm", "Building Permits", "New Home", "Existing Home",
+  "Initial Claims", "Continuing Claims", "ADP", "Michigan",
+  "Import", "Export", "Current Account", "Budget", "Deficit",
+  "Treasury", "Auction", "BOJ", "BOE", "ECB", "RBA", "PBOC",
+  "BI Rate", "Bank Indonesia", "Flash", "Preliminary", "Final"
 ];
 
 function nodeText(n) {
@@ -545,8 +586,11 @@ function normalizeMacroVal(v) {
   return s;
 }
 
-function macroInteresting(title) {
+function macroInteresting(title, impact) {
   const t = String(title || "");
+  // Always include High impact events regardless of keyword match
+  const imp = String(impact || "").toLowerCase();
+  if (imp === "high") return true;
   return MACRO_KEYWORDS.some(k => t.toLowerCase().includes(String(k).toLowerCase()));
 }
 
@@ -599,7 +643,7 @@ async function buildMacro(prevMacro = null, now = new Date()) {
   }
 
   // Filter to the stuff people actually care about.
-  events = events.filter(e => macroInteresting(e.title));
+  events = events.filter(e => macroInteresting(e.title, e.impact));
 
   const out = { updatedAt: nowIso(), source: "forex_factory", regions: {} };
   for (const region of REGIONS) {

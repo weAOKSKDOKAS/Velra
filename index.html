@@ -644,8 +644,8 @@ const el = (id) => document.getElementById(id);
 function safeDate(x){
   try { const d = new Date(x); return isNaN(d) ? null : d; } catch { return null; }
 }
-function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function stripHtml(s){ return String(s ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g," ").trim(); }
+function esc(s){ return String(s ?? "").replace(/\u00A0/g, " ").replace(/&nbsp;/g, " ").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function stripHtml(s){ return String(s ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g," ").replace(/\u00A0/g," ").replace(/&#160;/g," ").replace(/\s+/g," ").trim(); }
 
 function impactRank(v){
   const x = String(v||"").toUpperCase();
@@ -749,17 +749,35 @@ function filteredWire(region, sector){
   const arr = (state.data?.livewire || []).filter(x => x.region===region);
 
   if (sector === "GENERAL") {
-    // prefer dedicated general items, otherwise mix
+    // prefer dedicated general items, otherwise mix all
     const g = arr.filter(x => x.sector==="GENERAL");
     if (g.length) return g.slice();
-    return arr.slice().sort((a,b)=>{
+    // Deduplicate by storyKey, pick best version
+    const seen = new Map();
+    for (const x of arr) {
+      const prev = seen.get(x.storyKey);
+      if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
+    }
+    return Array.from(seen.values()).sort((a,b)=>{
       const ia=impactRank(a.impact), ib=impactRank(b.impact);
       if (ia!==ib) return ib-ia;
       return (safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0);
     }).slice(0,18);
   }
 
-  return arr.filter(x => x.sector===sector).slice();
+  // For specific sectors: check both primary sector AND sectors[] array
+  const matched = arr.filter(x =>
+    x.sector===sector ||
+    (Array.isArray(x.sectors) && x.sectors.includes(sector))
+  );
+
+  // Deduplicate by storyKey
+  const seen = new Map();
+  for (const x of matched) {
+    const prev = seen.get(x.storyKey);
+    if (!prev || (x.story && x.story.length > (prev.story||"").length)) seen.set(x.storyKey, x);
+  }
+  return Array.from(seen.values());
 }
 
 function getDigest(region, sector){
@@ -995,11 +1013,25 @@ function renderModal(){
         : `<span class="text-xs text-white/55">${n}</span>`;
     }).join(`<span class="mx-2 opacity-35">•</span>`);
 
+    // Only show story if it's meaningfully different from headline
+    const storyText = stripHtml(it.story || "");
+    const headlineNorm = it.headline.toLowerCase().trim();
+    const storyNorm = storyText.toLowerCase().trim();
+    const hasUniqueStory = storyText && storyNorm !== headlineNorm && storyText.length > headlineNorm.length + 10;
+
     modal.body.innerHTML = `
       <div class="px-5 py-5">
         <div class="serifTitle text-[2.1rem] font-extrabold leading-tight">${esc(it.headline)}</div>
-        ${it.keypoints?.length ? `<div class="mt-4 space-y-2">${it.keypoints.slice(0,6).map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("")}</div>` : ``}
-        ${it.story ? `<div class="mt-5 text-white/80 leading-relaxed">${esc(stripHtml(it.story))}</div>` : ``}
+        ${it.keypoints?.length ? `
+          <div class="mt-4">
+            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">POIN PENTING</div>
+            <div class="space-y-2">${it.keypoints.slice(0,6).map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("")}</div>
+          </div>` : ``}
+        ${hasUniqueStory ? `
+          <div class="mt-5">
+            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">RINGKASAN</div>
+            <div class="text-white/80 leading-relaxed">${esc(storyText)}</div>
+          </div>` : ``}
         ${srcHtml ? `<div class="mt-6 pt-4 border-t border-white/10"><div class="text-xs tracking-[.18em] font-extrabold text-white/45">SOURCE</div><div class="mt-2">${srcHtml}</div></div>` : ``}
       </div>
     `;
