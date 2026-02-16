@@ -9,599 +9,445 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,700;9..144,0,800;9..144,1,600;9..144,1,700;9..144,1,800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      --bg:#070707;
-      --card:#0c0c0c;
-      --card2:#0a0a0a;
-      --line:rgba(255,255,255,.14);
-      --line2:rgba(255,255,255,.10);
-      --txt:rgba(255,255,255,.92);
-      --muted:rgba(255,255,255,.58);
-      --muted2:rgba(255,255,255,.45);
-      --yellow:#f5c84c;
-      --yellow2:#d2a93d;
-      --green:#33d17a;
-      --red:#ff5a5a;
+      --bg:#0a0b0f;
+      --card:#12131a;
+      --card2:#0f1016;
+      --line:rgba(255,255,255,.08);
+      --line2:rgba(255,255,255,.05);
+      --txt:rgba(255,255,255,.88);
+      --muted:rgba(255,255,255,.50);
+      --muted2:rgba(255,255,255,.35);
+      --gold:#c9a84c;
+      --gold2:#b8963e;
+      --yellow:#c9a84c;
+      --yellow2:#b8963e;
+      --green:#00c853;
+      --red:#ff4444;
+      --blue:#4a9eff;
+      --mono:'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
     }
-    html,body{height:100%;}
+    *{box-sizing:border-box;}
+    html,body{height:100%;margin:0;}
     body{
-      background: radial-gradient(1100px 520px at 40% -10%, rgba(245,200,76,.10), transparent 55%),
-                  radial-gradient(900px 520px at 85% 10%, rgba(245,200,76,.06), transparent 55%),
-                  var(--bg);
+      background:var(--bg);
       color:var(--txt);
-      font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      letter-spacing:.2px;
+      font-family:Inter, system-ui, -apple-system, sans-serif;
+      letter-spacing:.01em;
+      font-size:14px;
+      -webkit-font-smoothing:antialiased;
     }
     .serifTitle{
-      font-family:Fraunces, ui-serif, Georgia, serif;
-      font-style:normal;           /* stop italic spam */
-      letter-spacing:.2px;
+      font-family:Fraunces, 'Georgia', serif;
+      font-style:italic;
+      letter-spacing:-.01em;
     }
+    .mono{font-family:var(--mono);}
     .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      background:var(--card);
       border:1px solid var(--line);
-      border-radius:18px;
-      box-shadow: 0 18px 60px rgba(0,0,0,.55);
-      backdrop-filter: blur(8px);
+      border-radius:6px;
     }
-    .subtleLine{ border-top:1px solid var(--line2); }
+    .subtleLine{border-top:1px solid var(--line);}
 
     .pill{
-      border:1px solid rgba(245,200,76,.35);
-      color:rgba(245,200,76,.95);
-      background:rgba(245,200,76,.07);
-      border-radius:999px;
+      border:1px solid rgba(201,168,76,.3);
+      color:var(--gold);
+      background:rgba(201,168,76,.06);
+      border-radius:3px;
       font-weight:700;
-      letter-spacing:.18em;
-      font-size:.70rem;
-      padding:.34rem .7rem;
+      letter-spacing:.14em;
+      font-size:.65rem;
+      padding:.25rem .55rem;
+      font-family:var(--mono);
     }
     .chip{
-      border:1px solid rgba(255,255,255,.16);
+      border:1px solid rgba(255,255,255,.1);
       background:rgba(255,255,255,.03);
-      border-radius:999px;
-      padding:.45rem .65rem;
-      color:rgba(255,255,255,.80);
+      border-radius:3px;
+      padding:.3rem .5rem;
+      color:rgba(255,255,255,.7);
       font-weight:600;
-      font-size:.78rem;
-      display:inline-flex;
-      gap:.4rem;
-      align-items:center;
+      font-size:.72rem;
+      display:inline-flex;gap:.3rem;align-items:center;
+      font-family:var(--mono);
     }
+
+    /* Header bar */
+    .topBar{
+      background:rgba(0,0,0,.4);
+      border-bottom:1px solid var(--line);
+      padding:.5rem 1.5rem;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .topBar .brand{
+      font-family:var(--mono);font-weight:800;font-size:.8rem;
+      letter-spacing:.22em;color:var(--gold);
+    }
+    .topBar .brand span{color:rgba(255,255,255,.6);}
+    .statusDot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;}
+
+    /* Region path header */
+    .regionBar{
+      background:rgba(0,0,0,.25);
+      border-bottom:1px solid var(--line);
+      padding:.55rem 1.5rem;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .regionPath{
+      font-family:var(--mono);font-weight:700;font-size:.72rem;
+      letter-spacing:.18em;color:rgba(255,255,255,.5);
+    }
+    .regionPath .active{color:var(--gold);}
 
     /* Left nav */
     .navBox{
-      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      background:var(--card);
       border:1px solid var(--line);
-      border-radius:18px;
+      border-radius:4px;
       overflow:hidden;
     }
     .navTitle{
-      padding:.95rem 1.05rem;
-      font-size:.72rem;
+      padding:.7rem .8rem;
+      font-family:var(--mono);
+      font-size:.62rem;
       letter-spacing:.18em;
-      font-weight:800;
-      color:rgba(245,200,76,.9);
-      display:flex;
-      gap:.55rem;
-      align-items:center;
-      background:rgba(0,0,0,.25);
-      border-bottom:1px solid var(--line2);
+      font-weight:700;
+      color:var(--gold);
+      display:flex;gap:.4rem;align-items:center;
+      background:rgba(0,0,0,.3);
+      border-bottom:1px solid var(--line);
     }
     .navItem{
-      width:100%;
-      text-align:left;
-      padding:.9rem 1.05rem;
-      border-bottom:1px solid rgba(255,255,255,.06);
-      color:rgba(255,255,255,.78);
-      font-weight:650;
-      transition: all .14s ease;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
+      width:100%;text-align:left;
+      padding:.55rem .8rem;
+      border-bottom:1px solid rgba(255,255,255,.04);
+      color:rgba(255,255,255,.55);
+      font-family:var(--mono);
+      font-weight:600;font-size:.72rem;
+      letter-spacing:.06em;
+      transition:all .1s;
+      display:flex;align-items:center;justify-content:space-between;
     }
-    .navItem:hover{ background: rgba(255,255,255,.03); }
+    .navItem:hover{background:rgba(255,255,255,.03);color:rgba(255,255,255,.8);}
     .navItem.active{
-      background: rgba(245,200,76,.12);
-      color: rgba(255,255,255,.95);
-      border-left:3px solid var(--yellow);
+      background:rgba(201,168,76,.08);
+      color:var(--gold);
+      border-left:2px solid var(--gold);
+      font-weight:700;
     }
-    .dot{
-      width:7px;height:7px;border-radius:999px;background:rgba(245,200,76,.65);
-    }
+    .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);}
 
     /* Breaking ticker */
     .breakingWrap{
-      border-top:1px solid rgba(255,255,255,.08);
-      border-bottom:1px solid rgba(255,255,255,.08);
-      background:rgba(0,0,0,.55);
+      border-bottom:1px solid var(--line);
+      background:rgba(0,0,0,.3);
       overflow:hidden;
     }
     .breakingInner{
-      display:flex;
-      gap:1rem;
-      align-items:center;
-      white-space:nowrap;
-      will-change:transform;
-      animation: ticker 120s linear infinite; /* slower */
-      padding:.55rem 0;
+      display:flex;gap:.8rem;align-items:center;
+      white-space:nowrap;will-change:transform;
+      animation:ticker 120s linear infinite;
+      padding:.4rem 0;
     }
-    .breakingInner:hover{ animation-play-state: paused; }
+    .breakingInner:hover{animation-play-state:paused;}
     @keyframes ticker{
-      0%{ transform: translateX(0); }
-      100%{ transform: translateX(-50%); }
+      0%{transform:translateX(0);}
+      100%{transform:translateX(-50%);}
     }
     .breakingBadge{
-      margin-left:1rem;
-      padding:.33rem .7rem;
-      border-radius:999px;
-      background: rgba(245,200,76,.12);
-      border:1px solid rgba(245,200,76,.35);
-      color: rgba(245,200,76,.95);
-      font-weight:800;
-      letter-spacing:.15em;
-      font-size:.70rem;
-      flex:0 0 auto;
+      margin-left:.8rem;
+      padding:.2rem .5rem;
+      border-radius:2px;
+      background:rgba(255,68,68,.15);
+      border:1px solid rgba(255,68,68,.3);
+      color:#ff4444;
+      font-family:var(--mono);
+      font-weight:800;letter-spacing:.12em;
+      font-size:.6rem;flex:0 0 auto;
     }
     .tickItem{
-      color:rgba(255,255,255,.78);
-      font-weight:650;
-      font-size:.82rem;
-      padding-right:2rem;
-      border-right:1px solid rgba(255,255,255,.10);
+      color:rgba(255,255,255,.6);font-weight:500;
+      font-size:.75rem;padding-right:1.2rem;
+      border-right:1px solid rgba(255,255,255,.06);
     }
     .tickTime{
-      color: rgba(245,200,76,.9);
-      font-weight:800;
-      margin-right:.35rem;
+      color:var(--gold);font-weight:700;
+      margin-right:.3rem;font-family:var(--mono);font-size:.68rem;
     }
 
     /* Wire cards */
     .wireCard{
-      background: rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.14);
-      border-radius:18px;
-      padding:1.05rem 1.05rem .95rem;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:4px;
+      overflow:hidden;
+      transition:all .12s;
       cursor:pointer;
     }
     .wireCard:hover{
-      transform: translateY(-2px);
-      border-color: rgba(245,200,76,.28);
-      background: rgba(255,255,255,.03);
+      border-color:rgba(201,168,76,.25);
+      background:rgba(255,255,255,.02);
     }
+    .wireCard .wireImg{
+      width:100%;height:120px;
+      object-fit:cover;
+      display:block;
+      background:rgba(255,255,255,.03);
+    }
+    .wireCard .wireBody{padding:.9rem;}
     .impactTag{
-      font-size:.64rem;
-      letter-spacing:.18em;
-      font-weight:900;
-      padding:.20rem .48rem;
-      border-radius:8px;
-      border:1px solid rgba(255,255,255,.16);
-      display:inline-flex;
-      align-items:center;
-      gap:.35rem;
+      font-family:var(--mono);
+      font-size:.55rem;letter-spacing:.14em;
+      font-weight:700;padding:.15rem .35rem;
+      border-radius:2px;
+      border:1px solid rgba(255,255,255,.1);
+      display:inline-flex;align-items:center;
     }
-    .impactHigh{ color: rgba(255,90,90,.95); border-color: rgba(255,90,90,.25); background: rgba(255,90,90,.07); }
-    .impactMed{ color: rgba(245,200,76,.95); border-color: rgba(245,200,76,.25); background: rgba(245,200,76,.07); }
-    .impactLow{ color: rgba(51,209,122,.95); border-color: rgba(51,209,122,.25); background: rgba(51,209,122,.07); }
+    .impactHigh{color:#ff4444;border-color:rgba(255,68,68,.25);background:rgba(255,68,68,.06);}
+    .impactMed{color:var(--gold);border-color:rgba(201,168,76,.25);background:rgba(201,168,76,.06);}
+    .impactLow{color:var(--green);border-color:rgba(0,200,83,.2);background:rgba(0,200,83,.05);}
 
     .wireTitle{
-      font-family: Inter, system-ui, sans-serif; /* no italic */
-      font-weight:800;
-      font-size:1.02rem;
-      line-height:1.25;
-      margin-top:.55rem;
-      color: rgba(255,255,255,.92);
+      font-weight:700;font-size:.88rem;line-height:1.25;
+      margin-top:.45rem;color:rgba(255,255,255,.88);
     }
     .wireMeta{
-      display:flex; justify-content:space-between; align-items:center;
-      margin-top:.5rem;
-      font-size:.72rem;
-      color: rgba(255,255,255,.50);
-      letter-spacing:.08em;
-      text-transform:uppercase;
+      display:flex;justify-content:space-between;align-items:center;
+      margin-top:.4rem;font-size:.65rem;
+      color:rgba(255,255,255,.4);
+      font-family:var(--mono);letter-spacing:.06em;
     }
     .wireKp{
-      margin-top:.75rem;
-      color: rgba(255,255,255,.72);
-      font-size:.85rem;
-      line-height:1.45;
+      color:rgba(255,255,255,.6);font-size:.8rem;line-height:1.4;
+      margin-top:.1rem;
     }
-    .wireKp li{ margin:.28rem 0; }
 
-    /* Modal */
+    /* Modal - Bloomberg Intelligence style */
     .modalBackdrop{
-      position:fixed; inset:0;
-      background: rgba(0,0,0,.72);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:50;
-      padding:20px;
+      position:fixed;inset:0;
+      background:rgba(0,0,0,.8);
+      backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;
+      z-index:50;padding:16px;
     }
-    .modalBackdrop.show{ display:flex; }
+    .modalBackdrop.show{display:flex;}
     .modalPanel{
-      width: min(1040px, calc(100vw - 34px)); /* wider */
-      max-height: min(92vh, 920px);
-      overflow:auto;
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(10,10,10,.92);
-      box-shadow: 0 30px 90px rgba(0,0,0,.65);
+      width:min(880px,calc(100vw - 32px));
+      max-height:min(94vh,960px);
+      overflow:auto;border-radius:4px;
+      border:1px solid rgba(255,255,255,.1);
+      background:var(--bg);
+      box-shadow:0 24px 80px rgba(0,0,0,.7);
     }
     .modalHeader{
-      position:sticky; top:0;
-      background: rgba(10,10,10,.92);
-      border-bottom:1px solid rgba(255,255,255,.10);
-      padding:14px 16px;
-      display:flex; align-items:center; justify-content:space-between;
-      z-index:2;
+      position:sticky;top:0;z-index:2;
+      background:rgba(10,11,15,.97);
+      border-bottom:1px solid var(--line);
+      padding:.6rem 1rem;
+      display:flex;align-items:center;justify-content:space-between;
     }
+    .modalHeaderLeft{
+      font-family:var(--mono);font-size:.62rem;
+      letter-spacing:.2em;font-weight:700;
+      color:rgba(255,255,255,.4);
+    }
+    .modalHeaderLeft b{color:var(--gold);}
     .closeBtn{
-      border:1px solid rgba(255,255,255,.16);
-      padding:.45rem .75rem;
-      border-radius:10px;
-      font-weight:800;
-      color: rgba(255,255,255,.80);
-      background: rgba(255,255,255,.03);
-    }
-    .closeBtn:hover{ border-color: rgba(245,200,76,.28); }
-    .modalBody{ padding:16px 16px 18px; }
-    .imgBox{
-      width:100%;
-      height: 280px;
-      border-radius:14px;
+      font-family:var(--mono);
       border:1px solid rgba(255,255,255,.12);
-      background: radial-gradient(700px 240px at 35% 20%, rgba(245,200,76,.20), transparent 55%),
-                  linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      overflow:hidden;
+      padding:.3rem .6rem;border-radius:3px;
+      font-weight:700;font-size:.65rem;letter-spacing:.1em;
+      color:rgba(255,255,255,.6);background:rgba(255,255,255,.03);
     }
-    .imgBox img{ width:100%; height:100%; object-fit:cover; }
-    .modalH1{
-      font-size:1.55rem;
-      line-height:1.15;
-      font-weight:900;
-      margin-top:14px;
-      color: rgba(255,255,255,.94);
-    }
-    .takeawayTitle{
-      margin-top:14px;
-      font-weight:900;
-      letter-spacing:.12em;
-      color: rgba(245,200,76,.95);
-      font-size:.75rem;
-      text-transform:uppercase;
-    }
-    .storyTitle{
-      margin-top:16px;
-      font-weight:900;
-      letter-spacing:.12em;
-      color: rgba(245,200,76,.95);
-      font-size:.75rem;
-      text-transform:uppercase;
-    }
-    .modalText{
-      color: rgba(255,255,255,.80);
-      line-height:1.65;
-      font-size:.95rem;
-      margin-top:10px;
-      white-space:pre-wrap;
-    }
-    .srcBox{
-      margin-top:14px;
-      padding-top:12px;
-      border-top:1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.62);
-      font-size:.85rem;
-    }
-    .srcBox a{
-      color: rgba(245,200,76,.95);
-      font-weight:800;
-      text-decoration: underline;
-      text-decoration-color: rgba(245,200,76,.45);
-    }
+    .closeBtn:hover{border-color:rgba(201,168,76,.3);color:var(--gold);}
+    .modalBody{padding:0;}
 
-    /* Brief carousel */
-    .briefNav{
-      display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
-    }
+    /* Brief styles */
     .briefBtn{
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.03);
-      color: rgba(255,255,255,.84);
-      font-weight:900;
-      padding:.45rem .7rem;
-      border-radius:10px;
-      font-size:.84rem;
+      font-family:var(--mono);
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.03);
+      color:rgba(255,255,255,.6);
+      font-weight:700;padding:.3rem .55rem;
+      border-radius:3px;font-size:.65rem;letter-spacing:.08em;
     }
-    .briefBtn:hover{ border-color: rgba(245,200,76,.28); }
-    .briefIdx{
-      color: rgba(255,255,255,.62);
-      font-weight:800;
-      font-size:.85rem;
-      margin:0 .25rem;
-    }
-    .briefSlideTitle{
-      font-weight:900;
-      font-size:1.25rem;
-      margin-top:.25rem;
-    }
-    .briefTable{
-      margin-top:12px;
-      width:100%;
-      border-collapse:collapse;
-      overflow:hidden;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-    }
-    .briefTable th, .briefTable td{
-      padding:10px 10px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-      font-size:.9rem;
-    }
-    .briefTable th{
-      color: rgba(245,200,76,.95);
-      font-weight:900;
-      letter-spacing:.10em;
-      text-transform:uppercase;
-      font-size:.72rem;
-      background: rgba(0,0,0,.35);
-    }
-    .briefTable td{ color: rgba(255,255,255,.82); }
-
-    /* Brief scroll layout (v2) */
-    .briefKicker{
-      color: rgba(245,200,76,.95);
-      font-weight:900;
-      letter-spacing:.18em;
-      font-size:.70rem;
-      text-transform:uppercase;
-    }
-    .briefTitle{
-      font-weight:950;
-      font-size:1.45rem;
-      margin-top:.25rem;
-      line-height:1.1;
-    }
-    .briefLede{
-      margin-top:.65rem;
-      color: rgba(255,255,255,.80);
-      line-height:1.55;
-      font-size:.95rem;
-    }
+    .briefBtn:hover{border-color:rgba(201,168,76,.3);color:var(--gold);}
     .briefSectionTitle{
-      margin-top:1.25rem;
-      font-weight:950;
-      letter-spacing:.04em;
-      font-size:1.05rem;
-    }
-    .gridCards{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap:12px;
-      margin-top:.75rem;
-    }
-    .briefCard{
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.03);
-      border-radius:14px;
-      padding:12px 12px 11px;
-    }
-    .briefCardTitle{
-      font-weight:900;
-      color: rgba(255,255,255,.92);
-      line-height:1.2;
-    }
-    .briefCardText{
-      color: rgba(255,255,255,.72);
-      font-size:.9rem;
-      line-height:1.45;
-      margin-top:.45rem;
-    }
-    .kpiGrid{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap:10px;
-      margin-top:.75rem;
-    }
-    .kpiLabel{ color: rgba(255,255,255,.55); font-weight:900; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; }
-    .kpiValue{ font-weight:950; font-size:1.05rem; margin-top:.25rem; }
-    .kpiDelta{ color: rgba(255,255,255,.70); font-weight:850; font-size:.85rem; margin-top:.15rem; }
-
-    .twoCol{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:12px;
-      margin-top:.75rem;
-    }
-    @media (max-width: 780px){
-      .twoCol{ grid-template-columns: 1fr; }
+      font-family:var(--mono);font-weight:700;
+      letter-spacing:.14em;font-size:.65rem;
+      color:rgba(255,255,255,.4);
     }
 
-    .barRow{ display:flex; align-items:center; gap:10px; margin-top:.55rem; }
-    .barLabel{ width:110px; color: rgba(255,255,255,.70); font-weight:850; font-size:.85rem; }
-    .barTrack{ flex:1; height:10px; border-radius:999px; background: rgba(255,255,255,.08); overflow:hidden; border:1px solid rgba(255,255,255,.10); }
-    .barFill{ height:100%; border-radius:999px; background: rgba(245,200,76,.65); }
-    .barVal{ width:120px; text-align:right; color: rgba(255,255,255,.78); font-weight:850; font-size:.85rem; }
-
-    .miniBtn{
-      margin-top:.6rem;
-      border:1px solid rgba(245,200,76,.28);
-      background: rgba(245,200,76,.08);
-      color: rgba(245,200,76,.95);
-      font-weight:900;
-      border-radius:10px;
-      padding:.4rem .6rem;
-      font-size:.78rem;
-      letter-spacing:.06em;
+    /* Status bar */
+    .statusBar{
+      position:fixed;bottom:0;left:0;right:0;
+      background:rgba(10,11,15,.95);
+      border-top:1px solid var(--line);
+      padding:.35rem 1.5rem;
+      display:flex;align-items:center;justify-content:space-between;
+      font-family:var(--mono);font-size:.6rem;
+      letter-spacing:.1em;color:rgba(255,255,255,.3);
+      z-index:40;
     }
-    .miniBtn:hover{ border-color: rgba(245,200,76,.45); }
+    .statusBar .live{color:var(--green);}
 
-    .tickerChip{ display:flex; align-items:center; gap:.5rem; font-weight:900; }
-    .tickerLogo{
-      width:22px; height:22px; border-radius:999px;
-      display:flex; align-items:center; justify-content:center;
-      background: rgba(245,200,76,.14);
-      border:1px solid rgba(245,200,76,.28);
-      color: rgba(245,200,76,.95);
-      font-size:.72rem;
-      line-height:1;
-      flex:0 0 auto;
+    /* Indicator mini cards */
+    .indCard{
+      background:var(--card);border:1px solid var(--line);
+      border-radius:4px;padding:.6rem .7rem;
     }
+    .indCard .code{font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.5);}
+    .indCard .val{font-weight:800;font-size:.95rem;margin-top:.2rem;color:rgba(255,255,255,.9);}
+    .indCard .chg{font-family:var(--mono);font-size:.7rem;font-weight:700;margin-top:.15rem;}
+    .indCard .up{color:var(--green);}
+    .indCard .dn{color:var(--red);}
+
+    /* Scrollbar */
+    ::-webkit-scrollbar{width:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);}
   </style>
 </head>
 
-<body>
-  <div class="w-full">
-    <div class="px-6 pt-5 pb-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-end gap-4">
-          <div class="text-[1.15rem] font-black tracking-[.22em]">
-            <span class="text-[var(--yellow)]">VELRA</span> <span class="text-white">TERMINAL</span>
-          </div>
-          <div class="text-xs tracking-[.22em] text-white/50 font-extrabold">
-            MARKET INTEL v4.4
-          </div>
-        </div>
+<body class="pb-8">
+  <div class="w-full min-h-screen">
 
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2 text-xs tracking-[.22em] font-extrabold text-white/65">
-            <span class="inline-block w-2 h-2 rounded-full bg-[var(--green)]"></span>
-            ONLINE
-          </div>
-          <button id="btnReconnect" class="border border-white/15 bg-white/5 hover:border-[rgba(245,200,76,.28)] text-white/80 font-extrabold tracking-[.18em] text-[.70rem] px-3 py-2 rounded-lg">
-            RECONNECT
-          </button>
-          <div class="text-xs tracking-[.18em] text-white/45 font-extrabold">
-            UPDATED: <span id="lastUpdated">—</span>
-          </div>
+    <!-- TOP BAR -->
+    <div class="topBar">
+      <div class="flex items-center gap-6">
+        <div class="brand">VELRA <span>TERMINAL</span></div>
+        <div class="mono text-[.6rem] tracking-[.14em] text-white/30 font-medium">MARKET INTELLIGENCE PLATFORM</div>
+      </div>
+      <div class="flex items-center gap-5">
+        <div class="flex items-center gap-2 mono text-[.6rem] tracking-[.12em] font-semibold text-white/45">
+          <span class="statusDot"></span> LIVE
+        </div>
+        <button id="btnReconnect" class="briefBtn">RECONNECT</button>
+        <div class="mono text-[.58rem] tracking-[.12em] text-white/30 font-medium">
+          <span id="lastUpdated">—</span>
         </div>
       </div>
     </div>
 
-    <div class="breakingWrap">
+    <!-- REGION PATH BAR -->
+    <div class="regionBar" id="regionBarEl">
+      <div class="regionPath">
+        <span class="active" id="regionPathRegion">INDONESIA</span>
+        <span> /// </span>
+        <span id="regionPathSector">General Market</span>
+      </div>
       <div class="flex items-center gap-3">
-        <div class="breakingBadge">BREAKING NEWS</div>
+        <button class="briefBtn" id="wireSortLatest">LATEST</button>
+        <button class="briefBtn" id="wireSortImpact">IMPACT</button>
+      </div>
+    </div>
+
+    <!-- BREAKING TICKER -->
+    <div class="breakingWrap">
+      <div class="flex items-center gap-2">
+        <div class="breakingBadge">WIRE</div>
         <div class="w-full overflow-hidden">
           <div class="breakingInner" id="tickerTrack"></div>
         </div>
       </div>
     </div>
 
-    <div class="p-6 grid grid-cols-[260px_1fr] gap-6">
-      <!-- LEFT -->
-      <aside class="space-y-5">
+    <!-- MAIN LAYOUT -->
+    <div class="grid grid-cols-[220px_1fr_280px] gap-0" style="min-height:calc(100vh - 140px)">
+
+      <!-- LEFT SIDEBAR -->
+      <aside class="border-r border-white/[.06] p-3 space-y-3">
         <div class="navBox">
           <div class="navTitle">
-            <span class="dot"></span>
-            WILAYAH PASAR
+            <span class="dot"></span> REGION
           </div>
           <div id="regionNav"></div>
         </div>
-
         <div class="navBox">
           <div class="navTitle">
-            <span class="dot" style="background:rgba(255,255,255,.38)"></span>
-            FILTER SEKTOR
+            <span class="dot" style="background:rgba(255,255,255,.25)"></span> SECTOR
           </div>
           <div id="sectorNav"></div>
         </div>
+
+        <!-- Morning Brief trigger -->
+        <div class="card p-3">
+          <div class="mono text-[.58rem] tracking-[.14em] font-bold text-[var(--gold)] mb-2">MORNING CALL</div>
+          <div class="serifTitle text-[1.1rem] font-bold leading-tight text-white/85" id="briefTitle" style="font-style:italic">Market Update</div>
+          <div class="mt-2 text-white/50 text-xs space-y-1" id="briefBullets"></div>
+          <button id="btnOpenBrief" class="hidden mt-3 w-full text-center mono text-[.6rem] tracking-[.12em] font-bold text-[var(--gold)] border border-[rgba(201,168,76,.2)] bg-[rgba(201,168,76,.04)] rounded py-1.5 hover:bg-[rgba(201,168,76,.08)]">
+            BACA SELENGKAPNYA &rarr;
+          </button>
+          <div class="mt-2" id="briefWatchlist"></div>
+        </div>
       </aside>
 
-      <!-- MAIN -->
-      <section class="space-y-6">
-        <!-- TOP GRID -->
-        <div class="grid grid-cols-12 gap-6">
-          <!-- BRIEF -->
-          <div class="col-span-8 card p-6" id="briefCard">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <div class="flex items-center gap-3 flex-wrap">
-                  <span class="pill" id="briefLabel">MORNING BRIEFING</span>
-                  <div class="text-xs tracking-[.22em] font-extrabold text-white/55" id="briefPath">—</div>
-                </div>
-              </div>
-              <button id="btnOpenBrief" class="briefBtn hidden">OPEN BRIEF</button>
-            </div>
-
-            <div class="mt-5">
-              <div class="serifTitle text-[3.0rem] leading-[.95] font-extrabold" id="briefTitle">Market Update</div>
-              <div class="mt-4 text-white/75 space-y-2" id="briefBullets"></div>
-              <div class="mt-5 subtleLine pt-4">
-                <div class="text-xs tracking-[.22em] font-extrabold text-white/40">WATCHLIST</div>
-                <div class="mt-3 flex flex-wrap gap-2" id="briefWatchlist"></div>
-              </div>
-            </div>
+      <!-- CENTER CONTENT -->
+      <section class="p-4 space-y-4">
+        <!-- KEY INDICATORS ROW -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="mono text-[.6rem] tracking-[.16em] font-bold text-[var(--gold)]">KEY INDICES & MOVERS</div>
+            <div class="mono text-[.55rem] tracking-[.1em] font-medium text-white/25" id="indAsOf">—</div>
           </div>
-
-          <!-- MACRO -->
-          <div class="col-span-4 card p-5" id="macroCard">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)]">DATA MAKRO</div>
-                <div class="text-xs tracking-[.22em] font-extrabold text-white/45 mt-1" id="macroPath">—</div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button class="briefBtn" id="macroTabMetric">METRIK</button>
-                <button class="briefBtn" id="macroTabTrend">TREN</button>
-                <button class="briefBtn" id="macroTabNext">NEXT</button>
-              </div>
-            </div>
-
-            <div class="mt-4 subtleLine pt-4">
-              <div class="grid grid-cols-4 gap-2 text-[.68rem] tracking-[.18em] font-extrabold text-white/45">
-                <div>METRIK</div><div class="text-right">SBLM</div><div class="text-right">FCAST</div><div class="text-right">AKT</div>
-              </div>
-              <div class="mt-3 text-white/45 text-sm" id="macroBody">Menunggu data makro…</div>
-            </div>
-
-            <div class="mt-5 subtleLine pt-4 text-[.70rem] tracking-[.22em] font-extrabold text-white/35">
-              SOURCE: INTERNAL SNAPSHOT
-            </div>
-          </div>
+          <div class="grid grid-cols-5 gap-2" id="indicatorsGrid"></div>
         </div>
 
-        <!-- KEY INDICATORS (FULL WIDTH) -->
-        <div class="card p-5">
-          <div class="flex items-center justify-between">
-            <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)]">KEY INDICATORS</div>
-            <div class="text-xs tracking-[.18em] font-extrabold text-white/45" id="indAsOf">—</div>
-          </div>
-          <div class="mt-4 grid grid-cols-2 gap-4" id="indicatorsGrid"></div>
-        </div>
-
-        <!-- WIRE -->
-        <div class="card p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="serifTitle text-[2.1rem] font-extrabold" id="wireTitle">Wire</div>
-              <div class="mt-1 text-xs tracking-[.22em] font-extrabold text-white/45" id="wireMeta">—</div>
+        <!-- LIVE WIRE -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="mono text-[.6rem] tracking-[.16em] font-bold text-[var(--gold)]">THE WIRE</div>
+              <div class="mono text-[.55rem] tracking-[.1em] font-medium text-white/30" id="wireTitle">Live Feed</div>
             </div>
-            <div class="flex items-center gap-2">
-              <button class="briefBtn" id="wireSortLatest">LATEST</button>
-              <button class="briefBtn" id="wireSortImpact">IMPACT</button>
-            </div>
+            <div class="mono text-[.55rem] tracking-[.1em] font-medium text-white/25" id="wireMeta"></div>
           </div>
-
-          <div class="mt-5 subtleLine pt-5">
-            <div class="grid grid-cols-3 gap-4" id="wireGrid"></div>
-            <div class="mt-4 text-white/45 text-sm hidden" id="wireEmpty">Tidak ada update signifikan ≤24 jam.</div>
-          </div>
+          <div class="grid grid-cols-3 gap-3" id="wireGrid"></div>
+          <div class="mt-4 text-white/35 text-xs hidden mono" id="wireEmpty">Tidak ada update signifikan &le;24 jam.</div>
         </div>
       </section>
+
+      <!-- RIGHT SIDEBAR - MACRO DATA -->
+      <aside class="border-l border-white/[.06] p-3">
+        <div class="card p-3" id="macroCard">
+          <div class="flex items-center justify-between mb-3">
+            <div class="mono text-[.58rem] tracking-[.14em] font-bold text-[var(--gold)]">DATA MAKRO</div>
+            <div class="flex gap-1">
+              <button class="briefBtn text-[.55rem] px-2 py-1" id="macroTabMetric">METRIK</button>
+              <button class="briefBtn text-[.55rem] px-2 py-1" id="macroTabTrend">TREN</button>
+              <button class="briefBtn text-[.55rem] px-2 py-1" id="macroTabNext">NEXT</button>
+            </div>
+          </div>
+          <div class="mono text-[.55rem] tracking-[.1em] font-medium text-white/30 mb-2" id="macroPath">—</div>
+          <div class="grid grid-cols-4 gap-1 text-[.55rem] mono tracking-[.1em] font-bold text-white/30 mb-2">
+            <div>METRIC</div><div class="text-right">PREV</div><div class="text-right">FCAST</div><div class="text-right">ACT</div>
+          </div>
+          <div class="text-white/40 text-xs" id="macroBody">Menunggu data makro...</div>
+          <div id="briefLabel" class="hidden"></div>
+          <div id="briefPath" class="hidden"></div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="statusBar">
+      <div><span class="live">&#9679;</span> VELRA TERMINAL v4.5 &mdash; CONNECTED</div>
+      <div>DATA REFRESH: AUTO &mdash; LAST: <span id="statusTime">—</span></div>
     </div>
   </div>
 
-  <!-- MODAL (news + brief) -->
+  <!-- MODAL -->
   <div class="modalBackdrop" id="modalBackdrop">
     <div class="modalPanel">
       <div class="modalHeader">
-        <div class="text-xs tracking-[.22em] font-extrabold text-white/55" id="modalKicker">—</div>
+        <div class="modalHeaderLeft" id="modalKicker"><b>VELRA</b> TERMINAL // INTELLIGENCE</div>
         <div class="flex items-center gap-2" id="modalHeaderRight">
-          <button class="closeBtn" id="modalCloseBtn">CLOSE</button>
+          <button class="closeBtn" id="modalCloseBtn">[ESC] CLOSE</button>
         </div>
       </div>
       <div class="modalBody" id="modalBody"></div>
@@ -657,6 +503,30 @@ function relativeTime(d){
   return `${days}h lalu`;
 }
 function stripHtml(s){ return String(s ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g," ").replace(/\u00A0/g," ").replace(/&#160;/g," ").replace(/\s+/g," ").trim(); }
+
+function wireImageUrl(headline, sector){
+  // Generate a deterministic abstract gradient image for each wire card
+  // Uses sector-based color themes for visual consistency
+  const sectorColors = {
+    TECHNOLOGY: ["1a1a2e","16213e","0f3460"],
+    FINANCE: ["1b1b2f","162447","1f4068"],
+    MINING_ENERGY: ["1a1a1a","2d2d2d","0d3b26"],
+    HEALTHCARE: ["1a1a2e","0d2f3f","162447"],
+    REGULATION: ["1f1f1f","2b1a1a","3d1a1a"],
+    CONSUMER: ["1a1a2e","1a2e1a","2d2d1a"],
+    GENERAL: ["12131a","1a1b24","0f1016"],
+  };
+  const colors = sectorColors[sector] || sectorColors.GENERAL;
+  // Simple hash from headline to pick variant
+  let h = 0;
+  for (let i = 0; i < (headline||"").length; i++) h = ((h << 5) - h + headline.charCodeAt(i)) | 0;
+  const idx = Math.abs(h) % 6;
+  const c1 = colors[idx % colors.length];
+  const c2 = colors[(idx + 1) % colors.length];
+  // Use a canvas-free SVG data URI for the gradient
+  const angle = (idx * 60) % 360;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#${c1}"/><stop offset="100%" style="stop-color:#${c2}"/></linearGradient></defs><rect width="400" height="200" fill="url(#g)"/><text x="200" y="108" text-anchor="middle" font-family="monospace" font-size="11" fill="rgba(255,255,255,0.12)" letter-spacing="4">${(sector||"WIRE").slice(0,12)}</text></svg>`)}`;
+}
 
 function impactRank(v){
   const x = String(v||"").toUpperCase();
@@ -1070,17 +940,14 @@ function renderIndicators(){
   ind.slice(0,12).forEach(it => {
     const ch = (typeof it.changePct==="number") ? it.changePct : null;
     const chTxt = ch===null ? "—" : (ch>=0 ? `+${ch.toFixed(2)}%` : `${ch.toFixed(2)}%`);
-    const chCls = ch===null ? "text-white/55" : (ch>=0 ? "text-green-300" : "text-red-300");
+    const chCls = ch===null ? "" : (ch>=0 ? "up" : "dn");
 
     const card = document.createElement("div");
-    card.className = "rounded-2xl border border-white/10 bg-white/5 p-4";
+    card.className = "indCard";
     card.innerHTML = `
-      <div class="text-xs tracking-[.18em] font-extrabold text-white/55">${esc(it.code || "")}</div>
-      <div class="mt-1 text-sm text-white/55">${esc(it.name || "")}</div>
-      <div class="mt-3 flex items-baseline justify-between">
-        <div class="text-[1.15rem] font-extrabold text-white/95">${esc(it.valueFmt || it.value || "—")}</div>
-        <div class="text-sm font-extrabold ${chCls}">${esc(chTxt)}</div>
-      </div>
+      <div class="code">${esc(it.code || "")}</div>
+      <div class="val">${esc(it.valueFmt || it.value || "—")}</div>
+      <div class="chg ${chCls}">${esc(chTxt)}</div>
     `;
     grid.appendChild(card);
   });
@@ -1136,14 +1003,18 @@ function renderWire(){
 
     const card = document.createElement("div");
     card.className = "wireCard";
+    const imgUrl = wireImageUrl(it.headline, it.sector);
     card.innerHTML = `
-      <div class="flex items-center justify-between">
-        <div class="impactTag ${impCls}">${esc(imp)}</div>
-        <div class="text-xs font-extrabold tracking-[.14em] text-white/45">${esc(timeTxt)}</div>
+      <img class="wireImg" src="${imgUrl}" alt="" loading="lazy">
+      <div class="wireBody">
+        <div class="flex items-center justify-between">
+          <div class="impactTag ${impCls}">${esc(imp)}</div>
+          <div class="mono text-[.58rem] font-bold tracking-[.1em] text-white/40">${esc(timeTxt)}</div>
+        </div>
+        <div class="wireTitle">${esc(it.headline)}</div>
+        ${kp.length ? `<div class="mt-2 space-y-1">${kp.map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("")}</div>` : ``}
+        ${src ? `<div class="wireMeta"><span>${esc(src)}</span></div>` : ``}
       </div>
-      <div class="mt-3 font-extrabold text-[1.05rem] leading-snug">${esc(it.headline)}</div>
-      ${kp.length ? `<div class="mt-3 space-y-1">${kp.map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("")}</div>` : ``}
-      ${src ? `<div class="mt-3 text-xs text-white/45 font-semibold">${esc(src)}</div>` : ``}
     `;
     card.onclick = () => openNews(it);
     grid.appendChild(card);
@@ -1166,8 +1037,14 @@ function renderAll(){
   renderWire();
   renderTicker();
 
+  // Update region path bar
+  el("regionPathRegion").textContent = REGION_META[state.region]?.label?.toUpperCase() || state.region;
+  el("regionPathSector").textContent = SECTOR_META[state.sector] || state.sector;
+
+  // Update timestamps
   const gen = safeDate(state.data?.generatedAt);
   el("lastUpdated").textContent = gen ? gen.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) : "—";
+  el("statusTime").textContent = new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 }
 
 // ===== Modal =====
@@ -1204,6 +1081,7 @@ function closeModal(){
 
 modal.closeBtn.onclick = closeModal;
 modal.backdrop.onclick = (e) => { if (e.target === modal.backdrop) closeModal(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
 function renderModal(){
   if (!state.open) return closeModal();
@@ -1211,37 +1089,51 @@ function renderModal(){
 
   if (state.open.type === "news"){
     const it = state.open.item;
-    modal.kicker.textContent = `${REGION_META[it.region]?.label || it.region} / ${SECTOR_META[it.sector] || it.sector}`;
-    modal.headerRight.innerHTML = `<div class="pill">${esc(String(it.impact||"MEDIUM").toUpperCase())}</div>`;
+    const impClass = String(it.impact||"MEDIUM").toUpperCase() === "HIGH" ? "impactHigh" : String(it.impact||"MEDIUM").toUpperCase() === "LOW" ? "impactLow" : "impactMed";
+    modal.kicker.innerHTML = `<b>VELRA</b> TERMINAL // INTELLIGENCE`;
 
-    const srcHtml = (it.sources||[]).slice(0,6).map(s => {
-      const u = s?.url ? esc(s.url) : "";
-      const n = esc(s?.name || u);
-      return u
-        ? `<a class="text-xs text-[rgba(245,200,76,.95)] hover:underline" target="_blank" rel="noopener" href="${u}">${n}</a>`
-        : `<span class="text-xs text-white/55">${n}</span>`;
-    }).join(`<span class="mx-2 opacity-35">•</span>`);
+    const t = safeDate(it.publishedAt);
+    const dateStr = t ? t.toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}) : "";
 
-    // Only show story if it's meaningfully different from headline
+    const srcLink = it.sources?.[0]?.url ? `<a class="text-[var(--gold)] hover:underline font-semibold text-xs" target="_blank" rel="noopener" href="${esc(it.sources[0].url)}">${esc(it.sources[0].name||"Source")}</a>` : "";
+
     const storyText = stripHtml(it.story || "");
     const headlineNorm = it.headline.toLowerCase().trim();
     const storyNorm = storyText.toLowerCase().trim();
     const hasUniqueStory = storyText && storyNorm !== headlineNorm && storyText.length > headlineNorm.length + 10;
 
     modal.body.innerHTML = `
-      <div class="px-5 py-5">
-        <div class="serifTitle text-[2.1rem] font-extrabold leading-tight">${esc(it.headline)}</div>
+      <div class="px-8 py-6">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-sm bg-[rgba(255,68,68,.1)] border border-[rgba(255,68,68,.25)] mono text-[.58rem] tracking-[.1em] font-bold text-[#ff4444]">VERIFIED WIRE</span>
+          ${dateStr ? `<span class="mono text-[.58rem] tracking-[.1em] text-white/35 font-medium">${esc(dateStr)}</span>` : ""}
+          <span class="impactTag ${impClass}">${esc(String(it.impact||"MEDIUM").toUpperCase())}</span>
+        </div>
+        <div class="serifTitle text-[2rem] font-bold leading-[1.1]" style="font-style:italic">${esc(it.headline)}</div>
+        <div class="mt-3 flex items-center gap-3">
+          <span class="mono text-[.58rem] tracking-[.1em] text-white/40 font-medium">EDITOR: Velra Desk</span>
+          <span class="inline-flex items-center gap-1.5 mono text-[.55rem] font-bold text-[var(--green)]"><span class="statusDot" style="width:5px;height:5px"></span> LIVE</span>
+          ${srcLink ? `<span class="text-white/20">|</span>${srcLink}` : ""}
+        </div>
+
         ${it.keypoints?.length ? `
-          <div class="mt-4">
-            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">POIN PENTING</div>
-            <div class="space-y-2">${it.keypoints.slice(0,6).map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("")}</div>
+          <div class="mt-6 border-l-2 border-[var(--gold)] pl-5">
+            <div class="mono text-[.6rem] tracking-[.16em] font-bold text-[var(--gold)] mb-3">KEY TAKEAWAYS</div>
+            <div class="space-y-3">
+              ${it.keypoints.slice(0,5).map((x,i) => `
+                <div class="flex gap-3">
+                  <span class="mono text-[.65rem] font-bold text-[var(--gold)] mt-0.5">${String(i+1).padStart(2,"0")}</span>
+                  <span class="text-white/75 text-[.88rem] leading-relaxed">${esc(x)}</span>
+                </div>
+              `).join("")}
+            </div>
           </div>` : ``}
+
         ${hasUniqueStory ? `
-          <div class="mt-5">
-            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">STORY</div>
-            <div class="text-white/80 leading-relaxed">${esc(storyText)}</div>
+          <div class="mt-6 pt-5 border-t border-white/[.06]">
+            <div class="mono text-[.6rem] tracking-[.16em] font-bold text-white/35 mb-3">THE STORY</div>
+            <div class="text-white/70 leading-[1.75] text-[.92rem]" style="font-family:Georgia,serif;white-space:pre-wrap;">${esc(storyText)}</div>
           </div>` : ``}
-        ${srcHtml ? `<div class="mt-6 pt-4 border-t border-white/10"><div class="text-xs tracking-[.18em] font-extrabold text-white/45">SOURCE</div><div class="mt-2">${srcHtml}</div></div>` : ``}
       </div>
     `;
     return;
@@ -1250,8 +1142,8 @@ function renderModal(){
   if (state.open.type === "brief"){
     const region = state.open.region;
     const brief = state.data?.morningBriefs?.[region];
-    modal.kicker.textContent = `${REGION_META[region].label} • ${brief.asOf || ""}`;
-    modal.headerRight.innerHTML = ``;
+    modal.kicker.innerHTML = `<b>VELRA</b> MACRO // BRIEFING`;
+    modal.headerRight.innerHTML = `<div class="flex items-center gap-2"><span class="mono text-[.55rem] text-white/30">${esc(brief?.asOf || "")}</span><button class="closeBtn" onclick="closeModal()">[ESC] CLOSE</button></div>`;
     if (region === "INDONESIA") {
       modal.body.innerHTML = renderBriefIndonesia(brief);
     } else if (region === "USA") {
@@ -1264,26 +1156,35 @@ function renderModal(){
 }
 
 function renderBriefDeck(brief){
-  const lede = brief?.lede ? `<div class="mt-4 text-white/75 leading-relaxed">${esc(brief.lede)}</div>` : "";
-  const slides = (brief?.slides || []).map(s => renderSlide(s)).join("");
+  const lede = brief?.lede ? `<div class="mt-4 text-white/65 leading-relaxed text-[.92rem]" style="font-family:Georgia,serif">${esc(brief.lede)}</div>` : "";
+  const slides = (brief?.slides || []).map((s, i) => renderSlide(s, i)).join("");
   return `
-    <div class="px-5 py-5">
-      <div class="serifTitle text-[2.3rem] font-extrabold">${esc(brief?.title || "Morning Brief")}</div>
+    <div class="px-8 py-6">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="mono text-[.58rem] tracking-[.14em] font-bold text-[var(--gold)]">VELRA MACRO</span>
+        <span class="statusDot" style="width:5px;height:5px"></span>
+      </div>
+      <div class="serifTitle text-[2.2rem] font-bold leading-[1.1]" style="font-style:italic">${esc(brief?.title || "Morning Brief")}</div>
       ${lede}
       <div class="mt-6 space-y-5">${slides}</div>
     </div>
   `;
 }
 
-function renderSlide(slide){
+function renderSlide(slide, idx){
   const title = esc(slide?.title || "");
   const type = slide?.type;
+  const num = String((idx || 0) + 1).padStart(2, "0");
 
   // helper wrappers
   const wrap = (inner) => `
     <div class="card p-5">
-      <div class="briefSectionTitle serifTitle">${title}</div>
-      <div class="mt-4">${inner}</div>
+      <div class="flex items-center gap-3 mb-4">
+        <span class="mono text-[.7rem] font-bold text-[var(--gold)]">${num}</span>
+        <span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span>
+        <span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">${title.toUpperCase()}</span>
+      </div>
+      <div>${inner}</div>
     </div>
   `;
 
@@ -1310,9 +1211,9 @@ function renderSlide(slide){
       const dx = flow.domesticNet?.valueFmt || flow.domesticNet?.value || "—";
       const topBuys = (flow.topBuys || []).slice(0,5).map(x => `<div class="wireKp">• ${esc(x.ticker || "")} ${esc(x.valueFmt || x.value || "")}</div>`).join("");
       const topSells = (flow.topSells || []).slice(0,5).map(x => `<div class="wireKp">• ${esc(x.ticker || "")} ${esc(x.valueFmt || x.value || "")}</div>`).join("");
-      const src = (flow.sources || []).slice(0,3).map(s => s?.url ? `<a class="text-xs text-[rgba(245,200,76,.95)] hover:underline" target="_blank" rel="noopener" href="${esc(s.url)}">${esc(s.name||"Source")}</a>` : "").filter(Boolean).join(`<span class="mx-2 opacity-35">•</span>`);
+      const src = (flow.sources || []).slice(0,3).map(s => s?.url ? `<a class="text-xs text-[var(--gold)] hover:underline" target="_blank" rel="noopener" href="${esc(s.url)}">${esc(s.name||"Source")}</a>` : "").filter(Boolean).join(`<span class="mx-2 opacity-35">•</span>`);
       flowBox = `
-        <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div class="mt-4 card p-4">
           <div class="text-xs tracking-[.18em] font-extrabold text-white/45">FLOW</div>
           ${note ? `<div class="mt-2 text-white/80">${esc(note)}</div>` : ``}
           <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1340,7 +1241,7 @@ function renderSlide(slide){
 
   if (type === "impact_cards"){
     const cards = (slide.cards || []).slice(0,6).map(c => `
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div class="card p-4">
         <div class="font-extrabold text-white/90">${esc(c.title || c.headline || "")}</div>
         <div class="mt-2 text-white/75 text-sm leading-relaxed">${esc(c.body || (c.keypoints ? c.keypoints.join(" • ") : ""))}</div>
       </div>
@@ -1355,7 +1256,7 @@ function renderSlide(slide){
 
   if (type === "news_list"){
     const items = (slide.items || []).slice(0,12).map(it => `
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div class="card p-4">
         <div class="flex items-center justify-between">
           <div class="text-xs tracking-[.18em] font-extrabold text-white/45">${esc(it.category || "")}</div>
           <div class="text-xs text-white/45 font-semibold">${safeDate(it.publishedAt)?.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) || ""}</div>
@@ -1370,7 +1271,7 @@ function renderSlide(slide){
 
   if (type === "corporate_actions"){
     const items = (slide.items || []).slice(0,10).map(it => `
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div class="card p-4">
         <div class="flex items-center justify-between">
           <div class="font-extrabold text-white/90">${esc(it.ticker||"")}</div>
           <div class="text-xs text-white/55 font-semibold">${esc(it.company||"")}</div>
@@ -1388,7 +1289,7 @@ function renderSlide(slide){
         <div class="text-xs tracking-[.18em] font-extrabold text-white/45">${esc(title)}</div>
         <div class="mt-2 space-y-2">
           ${(arr||[]).slice(0,3).map(it => `
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="card p-4">
               <div class="flex items-center justify-between">
                 <div class="font-extrabold text-white/90">${esc(it.ticker||"")}</div>
                 <div class="text-sm font-extrabold text-white/80">${esc(sign)}${esc((it.changePct ?? "—"))}${(typeof it.changePct==="number")?"%":""}</div>
@@ -1442,7 +1343,7 @@ function renderSlide(slide){
 
   if (type === "sector_cards"){
     const items = (slide.items||[]).slice(0,6).map(it => `
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div class="card p-4">
         <div class="font-extrabold text-white/90">${esc(SECTOR_META[it.sector] || it.sector || "")}</div>
         <div class="mt-2 text-white/70 text-sm">${esc(it.note || "")}</div>
       </div>
@@ -1476,9 +1377,9 @@ function renderSlide(slide){
   if (type === "deep_dive"){
     const it = slide.item || {};
     const bullets = (it.bullets || []).slice(0,6).map(x=>`<div class="wireKp">• ${esc(x)}</div>`).join("");
-    const src = (it.sources||[]).slice(0,1).map(s => s?.url ? `<a class="text-xs text-[rgba(245,200,76,.95)] hover:underline" target="_blank" rel="noopener" href="${esc(s.url)}">${esc(s.name||"Source")}</a>` : "").join("");
+    const src = (it.sources||[]).slice(0,1).map(s => s?.url ? `<a class="text-xs text-[var(--gold)] hover:underline" target="_blank" rel="noopener" href="${esc(s.url)}">${esc(s.name||"Source")}</a>` : "").join("");
     return wrap(`
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div class="card p-4">
         <div class="font-extrabold text-white/90">${esc(it.headline || "")}</div>
         ${it.body ? `<div class="mt-2 text-white/75 text-sm leading-relaxed">${esc(it.body)}</div>` : ``}
         ${bullets ? `<div class="mt-3 space-y-1">${bullets}</div>` : ``}
@@ -1538,7 +1439,7 @@ function renderBriefIndonesia(brief){
 
   const flowSection = `
     <div class="card p-5 mt-5">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)]">FLOW IHSG</div>
+      <div class="flex items-center gap-3"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">01</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">FLOW IHSG</span></div>
       <div class="mt-4 space-y-1">
         ${flowBar("Foreign Buy", fBuy, "rgba(245,200,76,.7)", "65%")}
         ${flowBar("Foreign Sell", fSell, "rgba(255,100,100,.6)", "55%")}
@@ -1551,7 +1452,7 @@ function renderBriefIndonesia(brief){
       </div>
       <div class="mt-5 grid grid-cols-2 gap-5">
         <div>
-          <div class="text-xs tracking-[.18em] font-extrabold text-[rgba(245,200,76,.8)] mb-2">TOP FOREIGN BUY</div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-[var(--gold)] mb-2">TOP FOREIGN BUY</div>
           ${topBuys.length ? topBuys.map((x,i) => tickerRow(x,i)).join("") : `<div class="text-white/40 text-sm">—</div>`}
         </div>
         <div>
@@ -1567,10 +1468,10 @@ function renderBriefIndonesia(brief){
   const impactCards = (impact?.cards || []).slice(0,3);
   const impactSection = impactCards.length ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">PERISTIWA BERDAMPAK HARI INI</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">02</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">PERISTIWA BERDAMPAK HARI INI</span></div>
       <div class="grid grid-cols-3 gap-3">
         ${impactCards.map(c => `
-          <div class="rounded-2xl border border-[rgba(245,200,76,.25)] bg-[rgba(245,200,76,.04)] p-4">
+          <div class="rounded border border-[rgba(201,168,76,.2)] bg-[rgba(201,168,76,.04)] p-4">
             <div class="font-extrabold text-white/90 text-sm leading-tight">${esc(c.title || c.headline || "")}</div>
             <div class="mt-2 text-white/65 text-xs leading-relaxed">${esc(c.body || "")}</div>
           </div>
@@ -1583,10 +1484,10 @@ function renderBriefIndonesia(brief){
   const newsItems = (news?.items || []).slice(0,5);
   const newsSection = newsItems.length ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">BERITA PENTING INDONESIA</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">03</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">BERITA PENTING INDONESIA</span></div>
       <div class="space-y-3">
         ${newsItems.map(it => `
-          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div class="card p-4">
             <div class="font-extrabold text-white/90 text-sm">${esc(it.headline || "")}</div>
             ${it.keypoints?.length ? `<div class="mt-2 text-white/60 text-xs leading-relaxed">${esc(it.keypoints.slice(0,2).join(" • "))}</div>` : ""}
           </div>
@@ -1603,12 +1504,12 @@ function renderBriefIndonesia(brief){
 
   const corpMoversSection = (corpItems.length || gainers.length || losers.length) ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">CORPORATE ACTION & TOP MOVERS LQ45</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">04</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">CORPORATE ACTION & TOP MOVERS LQ45</span></div>
       ${corpItems.length ? `
         <div class="grid grid-cols-2 gap-3 mb-4">
           ${corpItems.map(it => `
-            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4 flex items-start gap-3">
-              <div class="w-9 h-9 rounded-lg bg-[rgba(245,200,76,.12)] flex items-center justify-center text-xs font-extrabold text-[var(--yellow)]">${esc((it.ticker||"").slice(0,4))}</div>
+            <div class="card p-4 flex items-start gap-3">
+              <div class="w-9 h-9 rounded bg-[rgba(201,168,76,.12)] flex items-center justify-center text-xs font-extrabold text-[var(--gold)]">${esc((it.ticker||"").slice(0,4))}</div>
               <div class="flex-1 min-w-0">
                 <div class="font-extrabold text-white/90 text-sm">${esc(it.ticker || "")}</div>
                 <div class="text-white/60 text-xs mt-1 leading-relaxed">${esc(it.action || it.summary || "")}</div>
@@ -1622,7 +1523,7 @@ function renderBriefIndonesia(brief){
             <div class="text-xs tracking-[.18em] font-extrabold text-green-400/80 mb-2">TOP GAINER LQ45</div>
             ${gainers.map(it => `
               <div class="flex items-center gap-3 py-2 border-b border-white/8">
-                <div class="w-8 h-8 rounded-lg bg-green-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-green-400/70">${esc((it.ticker||"").slice(0,4))}</div>
+                <div class="w-8 h-8 rounded bg-green-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-green-400/70">${esc((it.ticker||"").slice(0,4))}</div>
                 <div class="flex-1"><span class="font-extrabold text-white/90 text-sm">${esc(it.ticker||"")}</span></div>
                 <div class="text-green-400 text-xs font-extrabold">+${esc(String(it.changePct ?? "—"))}%</div>
               </div>
@@ -1633,7 +1534,7 @@ function renderBriefIndonesia(brief){
             <div class="text-xs tracking-[.18em] font-extrabold text-red-400/80 mb-2">TOP LOSER LQ45</div>
             ${losers.map(it => `
               <div class="flex items-center gap-3 py-2 border-b border-white/8">
-                <div class="w-8 h-8 rounded-lg bg-red-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-red-400/70">${esc((it.ticker||"").slice(0,4))}</div>
+                <div class="w-8 h-8 rounded bg-red-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-red-400/70">${esc((it.ticker||"").slice(0,4))}</div>
                 <div class="flex-1"><span class="font-extrabold text-white/90 text-sm">${esc(it.ticker||"")}</span></div>
                 <div class="text-red-400 text-xs font-extrabold">${esc(String(it.changePct ?? "—"))}%</div>
               </div>
@@ -1649,7 +1550,7 @@ function renderBriefIndonesia(brief){
   const playbook = (wp?.playbook || wp?.actions || []).slice(0,4);
   const watchSection = `
     <div class="card p-5 mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">WATCHLIST & REKOMENDASI</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">05</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">WATCHLIST & REKOMENDASI</span></div>
       <div class="grid grid-cols-2 gap-5">
         <div>
           <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">WATCHLIST</div>
@@ -1673,10 +1574,14 @@ function renderBriefIndonesia(brief){
     </div>`;
 
   return `
-    <div class="px-5 py-5">
-      <div class="text-center">
-        <div class="serifTitle text-[2.3rem] font-extrabold">${esc(brief?.title || "Indonesia Morning Briefing")}</div>
-        ${lede ? `<div class="mt-3 text-white/70 leading-relaxed max-w-2xl mx-auto">${esc(lede)}</div>` : ""}
+    <div class="px-8 py-6">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="mono text-[.58rem] tracking-[.14em] font-bold text-[var(--gold)]">VELRA MACRO</span>
+          <span class="statusDot" style="width:5px;height:5px"></span>
+        </div>
+        <div class="serifTitle text-[2.2rem] font-bold leading-[1.1]" style="font-style:italic">${esc(brief?.title || "Indonesia Morning Briefing")}</div>
+        ${lede ? `<div class="mt-3 text-white/65 leading-relaxed text-[.92rem]" style="font-family:Georgia,serif">${esc(lede)}</div>` : ""}
       </div>
       ${flowSection}
       ${impactSection}
@@ -1699,14 +1604,14 @@ function renderBriefUSA(brief){
   const snapItems = (snap?.items || []).slice(0,6);
   const snapSection = snapItems.length ? `
     <div class="mt-5">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">MARKET SNAPSHOT</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">01</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">MARKET SNAPSHOT</span></div>
       <div class="grid grid-cols-5 gap-3">
         ${snapItems.map(it => {
           const ch = typeof it.changePct === "number" ? it.changePct : null;
           const chTxt = ch === null ? "" : (ch >= 0 ? `+${ch.toFixed(2)}%` : `${ch.toFixed(2)}%`);
           const chColor = ch === null ? "text-white/55" : (ch >= 0 ? "text-green-400" : "text-red-400");
           return `
-            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-3 text-center">
+            <div class="card p-3 text-center">
               <div class="text-xs text-white/50 font-semibold">${esc(it.note || it.label || "")}</div>
               <div class="text-white/95 font-extrabold mt-1">${esc(it.valueFmt || it.value || "—")}</div>
               ${chTxt ? `<div class="${chColor} text-xs font-extrabold mt-1">${esc(chTxt)}</div>` : ""}
@@ -1720,10 +1625,10 @@ function renderBriefUSA(brief){
   const impactCards = (impact?.cards || []).slice(0,3);
   const impactSection = impactCards.length ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">GLOBAL EVENTS IMPACTING MARKETS</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">02</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">GLOBAL EVENTS IMPACTING MARKETS</span></div>
       <div class="grid grid-cols-3 gap-3">
         ${impactCards.map(c => `
-          <div class="rounded-2xl border border-[rgba(245,200,76,.25)] bg-[rgba(245,200,76,.04)] p-4">
+          <div class="rounded border border-[rgba(201,168,76,.2)] bg-[rgba(201,168,76,.04)] p-4">
             <div class="font-extrabold text-white/90 text-sm leading-tight">${esc(c.title || c.headline || "")}</div>
             <div class="mt-2 text-white/65 text-xs leading-relaxed">${esc(c.body || "")}</div>
           </div>
@@ -1736,10 +1641,10 @@ function renderBriefUSA(brief){
   const newsItems = (news?.items || []).slice(0,5);
   const newsSection = newsItems.length ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">CORPORATE & KEY NEWS</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">03</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">CORPORATE & KEY NEWS</span></div>
       <div class="space-y-3">
         ${newsItems.map(it => `
-          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div class="card p-4">
             <div class="font-extrabold text-white/90 text-sm">${esc(it.headline || "")}</div>
             ${it.keypoints?.length ? `<div class="mt-2 text-white/60 text-xs leading-relaxed">${esc(it.keypoints.slice(0,2).join(" • "))}</div>` : ""}
           </div>
@@ -1769,11 +1674,11 @@ function renderBriefUSA(brief){
 
   const conditionSection = (rateItems.length || inflows.length || outflows.length) ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">MARKET CONDITIONS & FLOWS</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">04</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">MARKET CONDITIONS & FLOWS</span></div>
       ${rateItems.length ? `
         <div class="grid grid-cols-4 gap-3 mb-5">
           ${rateItems.map(it => `
-            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-3 text-center">
+            <div class="card p-3 text-center">
               <div class="text-xs text-white/50 font-semibold">${esc(it.label || "")}</div>
               <div class="text-white/95 font-extrabold mt-1">${esc(it.valueFmt || it.value || "—")}</div>
               ${it.note ? `<div class="text-white/50 text-[.65rem] mt-1">${esc(it.note)}</div>` : ""}
@@ -1801,11 +1706,11 @@ function renderBriefUSA(brief){
   const sectorItems = (sectorSlide?.items || []).slice(0,6);
   const sectorSection = sectorItems.length ? `
     <div class="mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">SECTOR OVERVIEW</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">05</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">SECTOR OVERVIEW</span></div>
       <div class="grid grid-cols-3 gap-3">
         ${sectorItems.map(it => `
-          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
-            <div class="font-extrabold text-[var(--yellow)] text-xs tracking-wider mb-2">${esc(SECTOR_META[it.sector] || it.sector || "")}</div>
+          <div class="card p-4">
+            <div class="font-extrabold text-[var(--gold)] text-xs tracking-wider mb-2">${esc(SECTOR_META[it.sector] || it.sector || "")}</div>
             <div class="space-y-1">
               ${(it.keypoints || []).slice(0,3).map(kp => `<div class="text-white/65 text-xs leading-relaxed">• ${esc(kp)}</div>`).join("")}
             </div>
@@ -1820,7 +1725,7 @@ function renderBriefUSA(brief){
   const playbook = (wp?.playbook || wp?.actions || []).slice(0,4);
   const watchSection = `
     <div class="card p-5 mt-6">
-      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">WATCHLIST & RECOMMENDED ACTIONS</div>
+      <div class="flex items-center gap-3 mb-4"><span class="mono text-[.7rem] font-bold text-[var(--gold)]">06</span><span class="mono text-[.58rem] tracking-[.12em] font-bold text-white/30">//</span><span class="mono text-[.62rem] tracking-[.12em] font-bold text-white/50">WATCHLIST & RECOMMENDED ACTIONS</span></div>
       <div class="grid grid-cols-2 gap-5">
         <div>
           <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">WATCHLIST</div>
@@ -1844,10 +1749,14 @@ function renderBriefUSA(brief){
     </div>`;
 
   return `
-    <div class="px-5 py-5">
-      <div class="text-center">
-        <div class="serifTitle text-[2.3rem] font-extrabold">${esc(brief?.title || "US Pre-Market Brief")}</div>
-        ${lede ? `<div class="mt-3 text-white/70 leading-relaxed max-w-2xl mx-auto">${esc(lede)}</div>` : ""}
+    <div class="px-8 py-6">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="mono text-[.58rem] tracking-[.14em] font-bold text-[var(--gold)]">VELRA MACRO</span>
+          <span class="statusDot" style="width:5px;height:5px"></span>
+        </div>
+        <div class="serifTitle text-[2.2rem] font-bold leading-[1.1]" style="font-style:italic">${esc(brief?.title || "US Pre-Market Brief")}</div>
+        ${lede ? `<div class="mt-3 text-white/65 leading-relaxed text-[.92rem]" style="font-family:Georgia,serif">${esc(lede)}</div>` : ""}
       </div>
       ${snapSection}
       ${impactSection}
