@@ -369,8 +369,82 @@ const SECTOR_KEYWORDS = {
   ],
 };
 
-const IMPACT_HIGH = ["plunge", "surge", "crash", "default", "recession", "inflation", "rate", "tariff", "sanction", "war", "ban", "cuts", "hikes", "emergency", "shock"];
-const IMPACT_MED  = ["earnings", "beats", "misses", "merger", "acquisition", "ipo", "lawsuit", "deal", "guidance", "probe", "investigation"];
+// Capital market relevance filter — reject news that has no bearing on markets/investing.
+// These are NEGATIVE keywords: if headline matches ONLY these and nothing else, skip.
+const NOT_MARKET_RELEVANT = [
+  // Lifestyle / entertainment / religion
+  "resep", "recipe", "liburan", "mudik", "lebaran", "imlek", "natal", "tahun baru",
+  "wisata kuliner", "destinasi", "tips liburan", "promo hotel",
+  "gossip", "selebrit", "artis", "film", "drama", "konser", "musik",
+  "olahraga", "sepak bola", "liga", "piala", "badminton", "tennis",
+  // Personal finance tips (not market-moving)
+  "tips cuan", "strategi cuan", "cara investasi pemula", "cara nabung",
+  "ide bisnis", "bisnis rumahan", "kerja sampingan", "usaha kecil",
+  // Crime / accidents (unless financial)
+  "kecelakaan", "banjir", "gempa", "tsunami", "kebakaran", "pembunuhan",
+  "cuaca", "hujan", "panas", "suhu",
+  // Health/wellness (not pharma/biotech)
+  "diet", "olahraga sehat", "tips sehat", "gizi", "kecantikan",
+];
+
+function isMarketRelevant(headline, description) {
+  const t = normText(`${headline || ""} ${description || ""}`);
+  if (!t) return false;
+
+  // If text matches any SECTOR_KEYWORDS, it's relevant
+  for (const kws of Object.values(SECTOR_KEYWORDS)) {
+    for (const kw of kws) {
+      if (hasToken(t, kw)) return true;
+    }
+  }
+
+  // Check negative list — if headline is dominated by non-market topics, reject
+  let negScore = 0;
+  for (const neg of NOT_MARKET_RELEVANT) {
+    if (t.includes(neg.toLowerCase())) negScore++;
+  }
+  if (negScore >= 2) return false;
+
+  // Default: allow through (might still be relevant)
+  return true;
+}
+
+// Impact classification — strict criteria for capital-market relevance.
+// HIGH: macro-level events that directly move the entire market
+//   (central bank decisions, GDP, CPI, geopolitical shocks, major regulation)
+// MEDIUM: micro/sector-level events (corporate action, sector news, currency moves, earnings)
+// LOW: everything else (general news, soft stories, minor updates)
+const IMPACT_HIGH = [
+  // Central bank / monetary policy
+  "fed fund", "fomc", "rate cut", "rate hike", "rate decision", "dovish", "hawkish",
+  "bank indonesia", "bi rate", "ecb rate", "boj rate", "boe rate", "pboc",
+  // Macro shocks
+  "recession", "default", "crisis", "crash", "circuit breaker", "black monday", "flash crash",
+  "gdp contract", "gdp shrink",
+  // Key macro data releases
+  "nfp", "non-farm", "nonfarm", "unemployment rate", "cpi release", "ppi release",
+  // Geopolitical
+  "war", "invasion", "sanction", "embargo", "trade war", "tariff war",
+  // Regulation that shakes markets
+  "emergency", "martial law", "capital control", "debt ceiling",
+];
+const IMPACT_MED  = [
+  // Corporate / micro
+  "earnings", "revenue", "profit", "loss", "guidance", "beats", "misses",
+  "merger", "acquisition", "takeover", "ipo", "rights issue", "buyback", "dividend",
+  "corporate action", "stock split", "delisting",
+  // Currency / rates
+  "currency", "forex", "exchange rate", "yield", "bond", "treasury",
+  "rupiah", "dollar", "dxy", "kurs",
+  // Sector-level
+  "oil price", "opec", "commodity", "coal price", "nickel price", "gold price",
+  // Legal / probe
+  "lawsuit", "probe", "investigation", "sec charge", "fraud",
+  // Medium-level data
+  "pmi", "consumer confidence", "retail sales", "industrial production",
+  "trade balance", "jolts", "initial claims", "housing",
+  "cpi", "ppi", "inflation", "gdp",
+];
 
 function normText(s) {
   return String(s || "").toLowerCase().replace(/[^a-z0-9\s\/\-&]/g, " ").replace(/\s+/g, " ").trim();
@@ -443,9 +517,10 @@ function inferSector(text) {
 }
 
 function inferImpact(text) {
-  const t = String(text || "").toLowerCase();
-  if (IMPACT_HIGH.some(k => t.includes(k))) return "HIGH";
-  if (IMPACT_MED.some(k => t.includes(k))) return "MEDIUM";
+  const t = normText(text);
+  if (!t) return "LOW";
+  if (IMPACT_HIGH.some(k => hasToken(t, k))) return "HIGH";
+  if (IMPACT_MED.some(k => hasToken(t, k))) return "MEDIUM";
   return "LOW";
 }
 
@@ -625,12 +700,18 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
 }
 
 function enforceQuota(items, maxTotal = SECTOR_MAX) {
-  const want = { HIGH: 4, MEDIUM: 4, LOW: 2 };
+  // Strict quota: HIGH max 4, MEDIUM max 4, LOW max 2 = total max 10.
+  // For GENERAL view (maxTotal > 10), allow more but keep proportions.
+  const isGeneral = maxTotal > 10;
+  const want = isGeneral
+    ? { HIGH: 6, MEDIUM: 8, LOW: 4 }   // GENERAL: up to 18
+    : { HIGH: 4, MEDIUM: 4, LOW: 2 };   // Sector: strict 10
+
   const by = { HIGH: [], MEDIUM: [], LOW: [] };
 
   for (const it of items) {
-    const k = String(it.impact || "MEDIUM").toUpperCase();
-    (by[k] || by.MEDIUM).push(it);
+    const k = String(it.impact || "LOW").toUpperCase();
+    (by[k] || by.LOW).push(it);
   }
 
   for (const k of Object.keys(by)) {
@@ -639,19 +720,6 @@ function enforceQuota(items, maxTotal = SECTOR_MAX) {
 
   const out = [];
   for (const k of ["HIGH", "MEDIUM", "LOW"]) out.push(...by[k].slice(0, want[k]));
-
-  if (out.length < maxTotal) {
-    const used = new Set(out.map(x => x.storyKey));
-    const rest = items.filter(x => !used.has(x.storyKey)).sort((a, b) => {
-      const ia = impactRank(a.impact), ib = impactRank(b.impact);
-      if (ia !== ib) return ib - ia;
-      return (safeDate(b.publishedAt)?.getTime() || 0) - (safeDate(a.publishedAt)?.getTime() || 0);
-    });
-    for (const it of rest) {
-      if (out.length >= maxTotal) break;
-      out.push(it);
-    }
-  }
 
   return out.slice(0, maxTotal);
 }
@@ -818,13 +886,13 @@ async function gatherRegionNews(region) {
 const MACRO_CAL_URL = process.env.MACRO_CAL_URL || "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
 const MACRO_CACHE_HOURS = Number(process.env.MACRO_CACHE_HOURS || 6);
 
-// Map region -> relevant currencies (ForexFactory codes)
+// Map region -> relevant currencies (ForexFactory uses country codes like USD, EUR etc.)
 const REGION_CCY = {
   USA: ["USD"],
-  EUROPE: ["EUR", "GBP"],
-  ASIA: ["JPY", "CNY", "HKD", "KRW"],
-  // IDR is often not available; show global drivers that typically move EM risk.
-  INDONESIA: ["USD", "CNY", "JPY"],
+  EUROPE: ["EUR", "GBP", "CHF"],
+  ASIA: ["JPY", "CNY", "HKD", "KRW", "AUD", "NZD"],
+  // Indonesia: IDR rarely in ForexFactory; show USD + key drivers that move EM/IDR
+  INDONESIA: ["USD", "CNY", "JPY", "IDR"],
 };
 
 const MACRO_KEYWORDS = [
@@ -853,39 +921,95 @@ function normalizeMacroVal(v) {
   return s;
 }
 
+// Priority macro events — these are ALWAYS included if found
+const MACRO_PRIORITY = [
+  "Non-Farm", "NFP", "Nonfarm", "Unemployment Rate", "CPI", "PPI",
+  "PMI", "Consumer Confidence", "JOLTS", "Fed Fund", "FOMC",
+  "GDP", "PCE", "Retail Sales", "ISM",
+  "BI Rate", "Bank Indonesia", "BOJ", "BOE", "ECB",
+];
+
 function macroInteresting(title, impact) {
-  const t = String(title || "");
+  const t = String(title || "").toLowerCase();
   // Always include High impact events regardless of keyword match
   const imp = String(impact || "").toLowerCase();
   if (imp === "high") return true;
-  return MACRO_KEYWORDS.some(k => t.toLowerCase().includes(String(k).toLowerCase()));
+  // Priority events always included
+  if (MACRO_PRIORITY.some(k => t.includes(k.toLowerCase()))) return true;
+  // Medium impact + keyword match
+  if (imp === "medium" && MACRO_KEYWORDS.some(k => t.includes(String(k).toLowerCase()))) return true;
+  // Low impact — only include if it matches priority keywords
+  return false;
 }
 
+// Forex Factory calendar URLs — try multiple in case one is down
+const MACRO_CAL_URLS = [
+  process.env.MACRO_CAL_URL || "https://nfs.faireconomy.media/ff_calendar_thisweek.xml",
+  "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+];
+
 async function fetchMacroCalendar() {
-  const res = await fetch(MACRO_CAL_URL, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; VelraTerminal/1.0)",
-      "accept": "application/xml,text/xml,*/*",
-    },
-  });
-  if (!res.ok) throw new Error(`macro cal HTTP ${res.status}`);
-  const xml = await res.text();
-  const obj = parser.parse(xml);
-  const ev = obj?.weeklyevents?.event || obj?.weeklyevents?.events?.event || obj?.weeklyevents?.events || obj?.event;
-  if (!ev) return [];
-  const arr = Array.isArray(ev) ? ev : [ev];
-  return arr.map(e => ({
-    title: nodeText(e.title),
-    country: nodeText(e.country),
-    currency: nodeText(e.currency),
-    date: nodeText(e.date),
-    time: nodeText(e.time),
-    impact: nodeText(e.impact),
-    actual: normalizeMacroVal(nodeText(e.actual)),
-    forecast: normalizeMacroVal(nodeText(e.forecast)),
-    previous: normalizeMacroVal(nodeText(e.previous)),
-    url: nodeText(e.url),
-  })).filter(x => x.title && x.currency);
+  // Try XML first
+  for (const url of MACRO_CAL_URLS) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "accept": "*/*",
+        },
+      });
+      if (!res.ok) { console.warn(`[worker] macro cal ${url} HTTP ${res.status}`); continue; }
+      const text = await res.text();
+
+      let events;
+      if (url.endsWith(".json")) {
+        // JSON format
+        const arr = JSON.parse(text);
+        events = (Array.isArray(arr) ? arr : []).map(e => ({
+          title: cleanText(e.title || ""),
+          country: cleanText(e.country || ""),
+          currency: cleanText(e.country || ""), // JSON uses 'country' as currency code
+          date: cleanText(e.date || ""),
+          time: cleanText(e.time || ""),
+          impact: cleanText(e.impact || ""),
+          actual: normalizeMacroVal(e.actual),
+          forecast: normalizeMacroVal(e.forecast),
+          previous: normalizeMacroVal(e.previous),
+          url: cleanText(e.url || ""),
+        }));
+      } else {
+        // XML format
+        const obj = parser.parse(text);
+        // Try multiple XML structures
+        const ev = obj?.weeklyevents?.event
+          || obj?.weeklyevents?.events?.event
+          || obj?.weeklyevents?.events
+          || obj?.event
+          || obj?.events?.event;
+        if (!ev) { console.warn(`[worker] macro XML parsed but no events found. Keys:`, Object.keys(obj || {})); continue; }
+        const arr = Array.isArray(ev) ? ev : [ev];
+        events = arr.map(e => ({
+          title: nodeText(e.title),
+          country: nodeText(e.country),
+          currency: nodeText(e.currency) || nodeText(e.country),
+          date: nodeText(e.date),
+          time: nodeText(e.time),
+          impact: nodeText(e.impact),
+          actual: normalizeMacroVal(nodeText(e.actual)),
+          forecast: normalizeMacroVal(nodeText(e.forecast)),
+          previous: normalizeMacroVal(nodeText(e.previous)),
+          url: nodeText(e.url),
+        }));
+      }
+
+      const valid = events.filter(x => x.title);
+      console.log(`[worker] macro cal ${url}: ${valid.length} events parsed`);
+      if (valid.length) return valid;
+    } catch (e) {
+      console.warn(`[worker] macro cal ${url} failed:`, e?.message || e);
+    }
+  }
+  return [];
 }
 
 function sortMacro(a, b) {
@@ -1169,15 +1293,20 @@ Aturan keras:
 INPUT (array):
 ${JSON.stringify(payload, null, 2)}
 
+ATURAN IMPACT (sangat ketat):
+- HIGH = HANYA makro yang langsung gerakkan seluruh pasar: keputusan bank sentral, GDP, CPI, geopolitik besar, regulasi darurat
+- MEDIUM = mikro/sektoral: corporate action, earnings, kurs, harga komoditas, regulasi biasa
+- LOW = berita umum, update ringan, opini, tips
+
 TUGAS:
 Untuk setiap item, tulis ulang menjadi objek:
 {
   "storyKey": "...",
   "headline": "headline yang lebih rapi (maks 110 char)",
   "sector": one of ${JSON.stringify(SECTORS)},
-  "impact": "HIGH|MEDIUM|LOW",
-  "keypoints": ["3 poin ringkas yang informatif, bukan copy-paste headline"],
-  "story": "narasi 120-200 kata yang menjelaskan konteks, dampak, dan detail penting berita"
+  "impact": "HIGH|MEDIUM|LOW (ikuti aturan ketat di atas)",
+  "keypoints": ["3 poin ringkas, masing-masing ±30 kata, informatif dan spesifik — BUKAN copy-paste headline"],
+  "story": "narasi ±200 kata dalam Bahasa Indonesia yang mudah dibaca. Jelaskan konteks, dampak ke pasar, dan detail penting. Jika konten asli tersedia (hasFullArticle=true), rephrase secukupnya ke ±200 kata. Jika kurang, tulis seadanya tanpa mengarang."
 }
 
 OUTPUT: JSON array (urutan bebas).
@@ -1600,8 +1729,9 @@ async function main() {
         hintSector: x.hintSector,
       }));
     const afterTrust = allBaseItems.filter(isTrustedItem);
-    const freshBase = afterTrust.filter(x => withinHours(x.publishedAt, TTL_HOURS, now));
-    console.log(`[worker] region=${region} pipeline: rss=${rssItems.length} → base=${allBaseItems.length} → trust=${afterTrust.length} → ttl=${freshBase.length}`);
+    const afterRelevance = afterTrust.filter(x => isMarketRelevant(x.headline, x.story || ""));
+    const freshBase = afterRelevance.filter(x => withinHours(x.publishedAt, TTL_HOURS, now));
+    console.log(`[worker] region=${region} pipeline: rss=${rssItems.length} → base=${allBaseItems.length} → trust=${afterTrust.length} → relevant=${afterRelevance.length} → ttl=${freshBase.length}`);
 
     // distribution after trust+TTL filter
     const baseBySector = {};

@@ -645,6 +645,17 @@ function safeDate(x){
   try { const d = new Date(x); return isNaN(d) ? null : d; } catch { return null; }
 }
 function esc(s){ return String(s ?? "").replace(/\u00A0/g, " ").replace(/&nbsp;/g, " ").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function relativeTime(d){
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "baru saja";
+  if (mins < 60) return `${mins}m lalu`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}j lalu`;
+  const days = Math.floor(hrs / 24);
+  return `${days}h lalu`;
+}
 function stripHtml(s){ return String(s ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g," ").replace(/\u00A0/g," ").replace(/&#160;/g," ").replace(/\s+/g," ").trim(); }
 
 function impactRank(v){
@@ -909,10 +920,9 @@ function renderNav(){
   });
 
   SECTORS.forEach(s => {
-    const count = filteredWire(state.region, s).length;
     const b = document.createElement("button");
     b.className = "navItem" + (state.sector===s ? " active" : "");
-    b.innerHTML = `<span>${esc(SECTOR_META[s])}</span><span class="text-xs text-white/40 font-extrabold">${count}</span>`;
+    b.textContent = SECTOR_META[s];
     b.onclick = () => { state.sector = s; renderAll(); };
     sn.appendChild(b);
   });
@@ -927,7 +937,15 @@ function renderNav(){
 }
 
 function filteredWire(region, sector){
-  const arr = (state.data?.livewire || []).filter(x => x.region===region);
+  const now = new Date();
+  const maxAgeMs = 24 * 60 * 60 * 1000; // 24 hours strict
+  const arr = (state.data?.livewire || []).filter(x => {
+    if (x.region !== region) return false;
+    // Client-side TTL: reject items older than 24h
+    const t = safeDate(x.publishedAt);
+    if (t && (now.getTime() - t.getTime()) > maxAgeMs) return false;
+    return true;
+  });
 
   // Helper: deduplicate by storyKey, keeping the richest version
   function dedup(items) {
@@ -953,7 +971,13 @@ function filteredWire(region, sector){
   // For specific sectors: use itemMatchesSector which checks
   // item.sector, item.sectors[], AND client-side keyword inference
   const matched = arr.filter(x => itemMatchesSector(x, sector));
-  return dedup(matched);
+  const unique = dedup(matched);
+  // Cap at 10 for sector views, sorted by impact then recency
+  return unique.sort((a,b) => {
+    const ia=impactRank(a.impact), ib=impactRank(b.impact);
+    if (ia!==ib) return ib-ia;
+    return (safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0);
+  }).slice(0, 10);
 }
 
 function getDigest(region, sector){
@@ -1081,7 +1105,7 @@ function renderWire(){
   items = items.slice(0, max);
 
   el("wireTitle").textContent = `${REGION_META[region].label} / ${SECTOR_META[sector]}`;
-  el("wireMeta").textContent = `${items.length} item`;
+  el("wireMeta").textContent = "";
 
   const grid = el("wireGrid");
   grid.innerHTML = "";
@@ -1103,7 +1127,7 @@ function renderWire(){
 
   items.forEach(it => {
     const t = safeDate(it.publishedAt);
-    const timeTxt = t ? t.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) : "—";
+    const timeTxt = t ? relativeTime(t) : "—";
     const imp = String(it.impact||"MEDIUM").toUpperCase();
     const impCls = imp==="HIGH" ? "impactHigh" : imp==="LOW" ? "impactLow" : "impactMed";
 
@@ -1214,7 +1238,7 @@ function renderModal(){
           </div>` : ``}
         ${hasUniqueStory ? `
           <div class="mt-5">
-            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">RINGKASAN</div>
+            <div class="text-xs tracking-[.18em] font-extrabold text-[var(--yellow)] mb-2">STORY</div>
             <div class="text-white/80 leading-relaxed">${esc(storyText)}</div>
           </div>` : ``}
         ${srcHtml ? `<div class="mt-6 pt-4 border-t border-white/10"><div class="text-xs tracking-[.18em] font-extrabold text-white/45">SOURCE</div><div class="mt-2">${srcHtml}</div></div>` : ``}
