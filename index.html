@@ -755,6 +755,30 @@ function getDigest(region, sector){
   };
 }
 
+function buildMiniChart(region) {
+  // Generate a mini SVG sparkline/market pulse from indicator data
+  const ind = state.data?.indicators?.[region] || state.data?.indices?.[region] || [];
+  const items = ind.slice(0, 6);
+  if (!items.length) {
+    // Placeholder pulse line
+    return `<svg viewBox="0 0 320 60" class="w-full h-14 mt-2 opacity-40"><path d="M0,35 Q40,15 80,30 T160,25 T240,35 T320,20" fill="none" stroke="rgba(200,169,81,.5)" stroke-width="1.5"/><circle cx="320" cy="20" r="2.5" fill="rgba(200,169,81,.6)"/></svg>`;
+  }
+  // Build mini bar chart from actual indicator changes
+  const maxAbs = Math.max(1, ...items.map(x => Math.abs(x.changePct || 0)));
+  const barW = Math.floor(280 / items.length);
+  const bars = items.map((it, i) => {
+    const ch = it.changePct || 0;
+    const h = Math.max(3, Math.abs(ch) / maxAbs * 35);
+    const y = ch >= 0 ? 40 - h : 40;
+    const color = ch >= 0 ? "rgba(34,197,94,.5)" : "rgba(239,68,68,.45)";
+    const x = 20 + i * barW;
+    const code = (it.code || "").slice(0, 5);
+    return `<rect x="${x}" y="${y}" width="${barW - 4}" height="${h}" rx="1.5" fill="${color}"/>
+      <text x="${x + (barW - 4) / 2}" y="56" text-anchor="middle" font-family="var(--mono)" font-size="6" fill="rgba(255,255,255,.25)">${code}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 320 62" class="w-full h-14 mt-2">${bars}<line x1="20" y1="40" x2="${20 + items.length * barW}" y2="40" stroke="rgba(255,255,255,.06)" stroke-width="0.5"/></svg>`;
+}
+
 function renderBrief(){
   const region = state.region;
   const sector = state.sector;
@@ -773,23 +797,30 @@ function renderBrief(){
     const digest = getDigest(region, "GENERAL");
     el("briefTitle").textContent = mb?.title || digest.title || "Market Update";
 
-    const parts = [];
-    if (mb?.lede) parts.push(mb.lede);
-    if (Array.isArray(digest?.bullets)) parts.push(...digest.bullets);
-
-    el("briefBullets").innerHTML = parts.slice(0,5).map(t => `<div class="wireKp">• ${esc(t)}</div>`).join("") || `<div class="text-white/40 text-xs mono tracking-wide">Menunggu ringkasan terbaru.</div>`;
-
-    const wl = digest?.watchlist || [];
-    el("briefWatchlist").innerHTML = wl.length
-      ? `<div class="mt-2 pt-2 border-t border-white/[.04]">${wl.slice(0,6).map(x => `<div class="text-white/55 text-xs">• ${esc(x)}</div>`).join("")}</div>`
-      : "";
+    // For GENERAL: show a mini chart + lede, no keypoints
+    const lede = mb?.lede || (digest?.bullets?.[0]) || "";
+    const chart = buildMiniChart(region);
+    el("briefBullets").innerHTML = `
+      ${chart}
+      ${lede ? `<div class="mt-2 text-white/50 text-[.82rem] leading-relaxed" style="font-family:Georgia,serif">${esc(lede)}</div>` : `<div class="text-white/30 text-xs mono tracking-wide mt-2">Menunggu ringkasan terbaru.</div>`}
+    `;
+    el("briefWatchlist").innerHTML = "";
     return;
   }
 
+  // For SECTOR views: show bold keypoints
   const dig = getDigest(region, sector);
   el("briefTitle").textContent = dig.title || `${SECTOR_META[sector]} Update`;
-  el("briefBullets").innerHTML = (dig.bullets || []).slice(0,5).map(t => `<div class="wireKp">• ${esc(t)}</div>`).join("") || `<div class="text-white/40 text-xs mono tracking-wide">Belum ada poin penting signifikan ≤24 jam.</div>`;
-  el("briefWatchlist").innerHTML = (dig.watchlist || []).slice(0,8).map(x => `<div class="text-white/55 text-xs">• ${esc(x)}</div>`).join("");
+  const bullets = (dig.bullets || []).slice(0, 5);
+  el("briefBullets").innerHTML = bullets.length
+    ? bullets.map((t, i) => `
+        <div class="flex gap-2.5 items-start py-1.5 ${i > 0 ? 'border-t border-white/[.03]' : ''}">
+          <span class="mono text-[.6rem] font-bold text-[var(--gold)] mt-0.5">${String(i+1).padStart(2,"0")}</span>
+          <span class="text-white/70 text-[.82rem] leading-snug font-medium">${esc(t)}</span>
+        </div>
+      `).join("")
+    : `<div class="text-white/30 text-xs mono tracking-wide">Belum ada poin penting signifikan ≤24 jam.</div>`;
+  el("briefWatchlist").innerHTML = "";
 }
 
 function renderMacro(){

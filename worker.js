@@ -22,7 +22,7 @@ const BUCKET = process.env.GCS_BUCKET || process.env.BUCKET_NAME || "";
 const OBJECT = process.env.DATA_OBJECT || "data.json";
 
 const RUN_MODE = String(process.env.MODE || "hourly").toLowerCase(); // hourly | morning | full
-const LOOKBACK_HOURS = Number(process.env.LOOKBACK_HOURS || (RUN_MODE === "full" ? 24 : 1));
+const LOOKBACK_HOURS = Number(process.env.LOOKBACK_HOURS || (RUN_MODE === "full" ? 24 : 3));
 const TTL_HOURS = Number(process.env.TTL_HOURS || 24);
 // How wide RSS discovery is. Keep this wide (default: TTL) so first run is not empty.
 const RSS_WINDOW_HOURS = Number(process.env.RSS_WINDOW_HOURS || TTL_HOURS);
@@ -31,7 +31,7 @@ const RSS_WINDOW_HOURS = Number(process.env.RSS_WINDOW_HOURS || TTL_HOURS);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || ""; // if empty, auto-fallback list
 const GEMINI_MAX_NEW = Number(process.env.GEMINI_MAX_NEW || 14); // max stories rewritten per region per run
-const GEMINI_MAX_TOKENS = Number(process.env.GEMINI_MAX_TOKENS || 4096);
+const GEMINI_MAX_TOKENS = Number(process.env.GEMINI_MAX_TOKENS || 8192);
 const GEMINI_TEMPERATURE = Number(process.env.GEMINI_TEMPERATURE || 0.3);
 
 // Limits
@@ -50,12 +50,18 @@ const REGION_TZ = {
   EUROPE: "Europe/London",
 };
 
-// Morning brief schedule (local time per region)
+// Morning brief schedule (local time per region) — weekdays only
 const MORNING_RELEASE_HOUR = {
-  INDONESIA: 8, // WIB
-  USA: 9,       // ET
-  ASIA: 7,      // HKT
-  EUROPE: 7,    // London
+  INDONESIA: 8,    // 08:00 WIB
+  USA: 20,         // 20:30 WIB → mapped to ET below
+  ASIA: 7,         // 07:30 HKT
+  EUROPE: 7,       // 07:00 London
+};
+const MORNING_RELEASE_MINUTE = {
+  INDONESIA: 0,
+  USA: 30,
+  ASIA: 30,
+  EUROPE: 0,
 };
 
 // RSS Search presets (Google News RSS Search)
@@ -1237,12 +1243,15 @@ function sanitizeRewritten(base, rewritten) {
     // Preserve existing keypoints/story if Gemini returns empty fields.
     if (kp && kp.length) out.keypoints = kp;
 
-    if (story && story.length >= 40) {
+    if (story && story.length >= 30) {
       out.story = story;
-    } else if (!out.story || out.story.length < 40) {
-      // last resort: build a minimal story from keypoints
+    } else if (!out.story || out.story.length < 30) {
+      // last resort: build a minimal story from headline + keypoints
       const kps = (out.keypoints || []).filter(Boolean);
-      if (kps.length) out.story = kps.join(" ");
+      const parts = [];
+      if (out.headline) parts.push(out.headline + ".");
+      if (kps.length) parts.push(kps.join(". ") + ".");
+      out.story = parts.join(" ");
     }
 
     out.llm = true;
@@ -1281,35 +1290,34 @@ async function rewriteItemsWithGemini(region, items, articleTexts = []) {
   });
 
   const prompt = `
-Kamu adalah editor pasar finansial. Kamu menulis ulang berita berdasarkan data input.
-Aturan keras:
-- Gunakan fakta dari headline DAN description (jika tersedia) untuk menulis narasi yang informatif.
-- Jika field "hasFullArticle" true, description berisi konten artikel asli — gunakan untuk membuat narasi yang kaya dan detail.
-- Jika "hasFullArticle" false, description hanya snippet singkat — tulis narasi sebaik mungkin dari yang tersedia.
-- Jangan mengarang angka, kutipan, atau detail yang tidak ada di input.
-- Bahasa Indonesia profesional, singkat, terminal-style.
-- Output valid JSON (tanpa markdown).
+Kamu adalah editor senior pasar finansial di terminal Bloomberg-style. Tugasmu menulis ulang berita menjadi laporan profesional.
 
 INPUT (array):
 ${JSON.stringify(payload, null, 2)}
 
-ATURAN IMPACT (sangat ketat):
-- HIGH = HANYA makro yang langsung gerakkan seluruh pasar: keputusan bank sentral, GDP, CPI, geopolitik besar, regulasi darurat
-- MEDIUM = mikro/sektoral: corporate action, earnings, kurs, harga komoditas, regulasi biasa
-- LOW = berita umum, update ringan, opini, tips
+ATURAN WAJIB:
+1. Setiap item HARUS memiliki "story" minimal 100 kata. Ini WAJIB — jangan pernah kosongkan field story.
+2. Jika "hasFullArticle" true: gunakan description untuk membuat narasi kaya 150-200 kata.
+3. Jika "hasFullArticle" false: kembangkan headline menjadi narasi informatif 100-150 kata. Jelaskan konteks pasar, dampak potensial, dan implikasi investor. Gunakan pengetahuanmu tentang pasar finansial untuk memberikan konteks yang relevan.
+4. Keypoints: 3 poin BERBEDA dari headline, informatif & spesifik, masing-masing ±25 kata.
+5. Jangan mengarang angka spesifik atau kutipan yang tidak ada di input.
+6. Bahasa Indonesia profesional, terminal-style.
+7. Output: valid JSON array (TANPA markdown code blocks).
 
-TUGAS:
-Untuk setiap item, tulis ulang menjadi objek:
-{
+ATURAN IMPACT:
+- HIGH = makro yang gerakkan seluruh pasar: bank sentral, GDP, CPI, geopolitik besar
+- MEDIUM = mikro/sektoral: corporate action, earnings, kurs, komoditas
+- LOW = berita umum, update ringan, opini
+
+FORMAT OUTPUT — JSON array:
+[{
   "storyKey": "...",
-  "headline": "headline yang lebih rapi (maks 110 char)",
+  "headline": "headline rapi (maks 110 char)",
   "sector": one of ${JSON.stringify(SECTORS)},
-  "impact": "HIGH|MEDIUM|LOW (ikuti aturan ketat di atas)",
-  "keypoints": ["3 poin ringkas, masing-masing ±30 kata, informatif dan spesifik — BUKAN copy-paste headline"],
-  "story": "narasi ±200 kata dalam Bahasa Indonesia yang mudah dibaca. Jelaskan konteks, dampak ke pasar, dan detail penting. Jika konten asli tersedia (hasFullArticle=true), rephrase secukupnya ke ±200 kata. Jika kurang, tulis seadanya tanpa mengarang."
-}
-
-OUTPUT: JSON array (urutan bebas).
+  "impact": "HIGH|MEDIUM|LOW",
+  "keypoints": ["poin 1", "poin 2", "poin 3"],
+  "story": "narasi profesional MINIMAL 100 kata..."
+}]
 `.trim();
 
   for (const model of modelFallback) {
@@ -2082,12 +2090,19 @@ async function main() {
   for (const region of REGIONS) {
     const { hour, minute } = localHourMinute(region, startedAt);
     const releaseHour = MORNING_RELEASE_HOUR[region];
+    const releaseMinute = MORNING_RELEASE_MINUTE[region] || 0;
     const todayKey = localDateKey(region, startedAt);
 
-    const shouldGenerate =
+    // Check if today is a weekday (Mon-Fri) in the region's timezone
+    const tz = REGION_TZ[region] || "UTC";
+    const dayOfWeek = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(startedAt);
+    const isWeekday = !["Sat", "Sun"].includes(dayOfWeek);
+
+    const shouldGenerate = isWeekday && (
       (RUN_MODE === "morning") ||
       (RUN_MODE === "full") ||
-      (hour > releaseHour || (hour === releaseHour && minute >= 0));
+      (hour > releaseHour || (hour === releaseHour && minute >= releaseMinute))
+    );
 
     const already = mbMeta[region] === todayKey;
 
