@@ -1252,7 +1252,13 @@ function renderModal(){
     const brief = state.data?.morningBriefs?.[region];
     modal.kicker.textContent = `${REGION_META[region].label} • ${brief.asOf || ""}`;
     modal.headerRight.innerHTML = ``;
-    modal.body.innerHTML = renderBriefDeck(brief);
+    if (region === "INDONESIA") {
+      modal.body.innerHTML = renderBriefIndonesia(brief);
+    } else if (region === "USA") {
+      modal.body.innerHTML = renderBriefUSA(brief);
+    } else {
+      modal.body.innerHTML = renderBriefDeck(brief);
+    }
     return;
   }
 }
@@ -1482,6 +1488,375 @@ function renderSlide(slide){
   }
 
 return wrap(`<div class="text-white/60">Slide type tidak didukung: ${esc(type)}</div>`);
+}
+
+// -------- INDONESIA MORNING BRIEFING --------
+function renderBriefIndonesia(brief){
+  const slides = brief?.slides || [];
+  const findSlide = (type) => slides.find(s => s?.type === type);
+
+  // Opening paragraph
+  const lede = brief?.lede || "";
+
+  // FLOW IHSG section
+  const snap = findSlide("market_snapshot");
+  const flow = snap?.flow || {};
+  const fBuy = flow.foreignBuy || "—";
+  const fSell = flow.foreignSell || "—";
+  const dBuy = flow.domesticBuy || "—";
+  const dSell = flow.domesticSell || "—";
+  const fNet = flow.foreignNet?.valueFmt || flow.foreignNet?.value || "—";
+  const dNet = flow.domesticNet?.valueFmt || flow.domesticNet?.value || "—";
+  const indexNote = flow.miniNote || flow.indexMove || "";
+  const topBuys = (flow.topBuys || []).slice(0,3);
+  const topSells = (flow.topSells || []).slice(0,3);
+
+  // Helper: horizontal bar (CSS-only)
+  function flowBar(label, value, color, maxWidth) {
+    const w = maxWidth || "100%";
+    return `<div class="flex items-center gap-3 py-1">
+      <div class="w-20 text-xs text-white/55 font-semibold text-right">${esc(label)}</div>
+      <div class="flex-1 h-5 bg-white/5 rounded overflow-hidden">
+        <div class="h-full rounded" style="width:${w};background:${color}"></div>
+      </div>
+      <div class="w-24 text-xs text-white/80 font-extrabold text-right">${esc(String(value))}</div>
+    </div>`;
+  }
+
+  // Helper: ticker row for buy/sell table
+  function tickerRow(item, idx) {
+    const ticker = item?.ticker || "—";
+    const val = item?.valueFmt || item?.value || "—";
+    return `<div class="flex items-center gap-3 py-2 border-b border-white/8">
+      <div class="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-[.6rem] font-extrabold text-white/50">${idx+1}</div>
+      <div class="flex-1">
+        <span class="font-extrabold text-white/90 text-sm">${esc(ticker)}</span>
+      </div>
+      <div class="text-xs text-white/70 font-semibold">${esc(val)}</div>
+    </div>`;
+  }
+
+  const flowSection = `
+    <div class="card p-5 mt-5">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)]">FLOW IHSG</div>
+      <div class="mt-4 space-y-1">
+        ${flowBar("Foreign Buy", fBuy, "rgba(245,200,76,.7)", "65%")}
+        ${flowBar("Foreign Sell", fSell, "rgba(255,100,100,.6)", "55%")}
+        ${flowBar("Domestic Buy", dBuy, "rgba(245,200,76,.5)", "70%")}
+        ${flowBar("Domestic Sell", dSell, "rgba(255,100,100,.4)", "60%")}
+      </div>
+      <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-white/60">
+        <div>Foreign Net: <span class="font-extrabold text-white/80">${esc(fNet)}</span></div>
+        <div>Domestic Net: <span class="font-extrabold text-white/80">${esc(dNet)}</span></div>
+      </div>
+      <div class="mt-5 grid grid-cols-2 gap-5">
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-[rgba(245,200,76,.8)] mb-2">TOP FOREIGN BUY</div>
+          ${topBuys.length ? topBuys.map((x,i) => tickerRow(x,i)).join("") : `<div class="text-white/40 text-sm">—</div>`}
+        </div>
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-[rgba(255,100,100,.8)] mb-2">TOP FOREIGN SELL</div>
+          ${topSells.length ? topSells.map((x,i) => tickerRow(x,i)).join("") : `<div class="text-white/40 text-sm">—</div>`}
+        </div>
+      </div>
+      ${indexNote ? `<div class="mt-4 pt-3 border-t border-white/10 text-sm text-white/70">${esc(indexNote)}</div>` : ""}
+    </div>`;
+
+  // Impact events (3 cards)
+  const impact = findSlide("impact_cards");
+  const impactCards = (impact?.cards || []).slice(0,3);
+  const impactSection = impactCards.length ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">PERISTIWA BERDAMPAK HARI INI</div>
+      <div class="grid grid-cols-3 gap-3">
+        ${impactCards.map(c => `
+          <div class="rounded-2xl border border-[rgba(245,200,76,.25)] bg-[rgba(245,200,76,.04)] p-4">
+            <div class="font-extrabold text-white/90 text-sm leading-tight">${esc(c.title || c.headline || "")}</div>
+            <div class="mt-2 text-white/65 text-xs leading-relaxed">${esc(c.body || "")}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>` : "";
+
+  // Important news (4-5 items as cards)
+  const news = findSlide("news_list");
+  const newsItems = (news?.items || []).slice(0,5);
+  const newsSection = newsItems.length ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">BERITA PENTING INDONESIA</div>
+      <div class="space-y-3">
+        ${newsItems.map(it => `
+          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+            <div class="font-extrabold text-white/90 text-sm">${esc(it.headline || "")}</div>
+            ${it.keypoints?.length ? `<div class="mt-2 text-white/60 text-xs leading-relaxed">${esc(it.keypoints.slice(0,2).join(" • "))}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>` : "";
+
+  // Corporate Actions + Top Movers LQ45 (merged)
+  const corp = findSlide("corporate_actions");
+  const movers = findSlide("top_movers");
+  const corpItems = (corp?.items || []).slice(0,4);
+  const gainers = (movers?.gainers || []).slice(0,3);
+  const losers = (movers?.losers || []).slice(0,3);
+
+  const corpMoversSection = (corpItems.length || gainers.length || losers.length) ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">CORPORATE ACTION & TOP MOVERS LQ45</div>
+      ${corpItems.length ? `
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          ${corpItems.map(it => `
+            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4 flex items-start gap-3">
+              <div class="w-9 h-9 rounded-lg bg-[rgba(245,200,76,.12)] flex items-center justify-center text-xs font-extrabold text-[var(--yellow)]">${esc((it.ticker||"").slice(0,4))}</div>
+              <div class="flex-1 min-w-0">
+                <div class="font-extrabold text-white/90 text-sm">${esc(it.ticker || "")}</div>
+                <div class="text-white/60 text-xs mt-1 leading-relaxed">${esc(it.action || it.summary || "")}</div>
+              </div>
+            </div>
+          `).join("")}
+        </div>` : ""}
+      ${(gainers.length || losers.length) ? `
+        <div class="grid grid-cols-2 gap-5">
+          <div>
+            <div class="text-xs tracking-[.18em] font-extrabold text-green-400/80 mb-2">TOP GAINER LQ45</div>
+            ${gainers.map(it => `
+              <div class="flex items-center gap-3 py-2 border-b border-white/8">
+                <div class="w-8 h-8 rounded-lg bg-green-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-green-400/70">${esc((it.ticker||"").slice(0,4))}</div>
+                <div class="flex-1"><span class="font-extrabold text-white/90 text-sm">${esc(it.ticker||"")}</span></div>
+                <div class="text-green-400 text-xs font-extrabold">+${esc(String(it.changePct ?? "—"))}%</div>
+              </div>
+              ${it.why ? `<div class="text-white/50 text-xs ml-11 mb-1">${esc(it.why)}</div>` : ""}
+            `).join("")}
+          </div>
+          <div>
+            <div class="text-xs tracking-[.18em] font-extrabold text-red-400/80 mb-2">TOP LOSER LQ45</div>
+            ${losers.map(it => `
+              <div class="flex items-center gap-3 py-2 border-b border-white/8">
+                <div class="w-8 h-8 rounded-lg bg-red-400/10 flex items-center justify-center text-[.6rem] font-extrabold text-red-400/70">${esc((it.ticker||"").slice(0,4))}</div>
+                <div class="flex-1"><span class="font-extrabold text-white/90 text-sm">${esc(it.ticker||"")}</span></div>
+                <div class="text-red-400 text-xs font-extrabold">${esc(String(it.changePct ?? "—"))}%</div>
+              </div>
+              ${it.why ? `<div class="text-white/50 text-xs ml-11 mb-1">${esc(it.why)}</div>` : ""}
+            `).join("")}
+          </div>
+        </div>` : ""}
+    </div>` : "";
+
+  // Watchlist & Recommendations
+  const wp = findSlide("watchlist_playbook");
+  const watchlist = (wp?.watchlist || []).slice(0,6);
+  const playbook = (wp?.playbook || wp?.actions || []).slice(0,4);
+  const watchSection = `
+    <div class="card p-5 mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">WATCHLIST & REKOMENDASI</div>
+      <div class="grid grid-cols-2 gap-5">
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">WATCHLIST</div>
+          ${watchlist.map(it => {
+            const t = typeof it === "string" ? it : it.ticker || "";
+            const w = typeof it === "string" ? "" : it.why || "";
+            return `<div class="py-2 border-b border-white/8">
+              <span class="font-extrabold text-white/90 text-sm">${esc(t)}</span>
+              ${w ? `<span class="text-white/50 text-xs ml-2">${esc(w)}</span>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">TINDAKAN</div>
+          <div class="space-y-2">
+            ${playbook.map(x => `<div class="text-white/75 text-sm leading-relaxed">• ${esc(typeof x === "string" ? x : x.text || "")}</div>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-white/10 text-white/30 text-[.65rem] tracking-wide">DISCLAIMER: Bukan nasihat keuangan. Lakukan riset mandiri sebelum mengambil keputusan investasi.</div>
+    </div>`;
+
+  return `
+    <div class="px-5 py-5">
+      <div class="text-center">
+        <div class="serifTitle text-[2.3rem] font-extrabold">${esc(brief?.title || "Indonesia Morning Briefing")}</div>
+        ${lede ? `<div class="mt-3 text-white/70 leading-relaxed max-w-2xl mx-auto">${esc(lede)}</div>` : ""}
+      </div>
+      ${flowSection}
+      ${impactSection}
+      ${newsSection}
+      ${corpMoversSection}
+      ${watchSection}
+    </div>
+  `;
+}
+
+// -------- USA MORNING BRIEFING --------
+function renderBriefUSA(brief){
+  const slides = brief?.slides || [];
+  const findSlide = (type) => slides.find(s => s?.type === type);
+
+  const lede = brief?.lede || "";
+
+  // Market Snapshot cards
+  const snap = findSlide("market_snapshot");
+  const snapItems = (snap?.items || []).slice(0,6);
+  const snapSection = snapItems.length ? `
+    <div class="mt-5">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">MARKET SNAPSHOT</div>
+      <div class="grid grid-cols-5 gap-3">
+        ${snapItems.map(it => {
+          const ch = typeof it.changePct === "number" ? it.changePct : null;
+          const chTxt = ch === null ? "" : (ch >= 0 ? `+${ch.toFixed(2)}%` : `${ch.toFixed(2)}%`);
+          const chColor = ch === null ? "text-white/55" : (ch >= 0 ? "text-green-400" : "text-red-400");
+          return `
+            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-3 text-center">
+              <div class="text-xs text-white/50 font-semibold">${esc(it.note || it.label || "")}</div>
+              <div class="text-white/95 font-extrabold mt-1">${esc(it.valueFmt || it.value || "—")}</div>
+              ${chTxt ? `<div class="${chColor} text-xs font-extrabold mt-1">${esc(chTxt)}</div>` : ""}
+            </div>`;
+        }).join("")}
+      </div>
+    </div>` : "";
+
+  // Global impact events (3 cards)
+  const impact = findSlide("impact_cards");
+  const impactCards = (impact?.cards || []).slice(0,3);
+  const impactSection = impactCards.length ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">GLOBAL EVENTS IMPACTING MARKETS</div>
+      <div class="grid grid-cols-3 gap-3">
+        ${impactCards.map(c => `
+          <div class="rounded-2xl border border-[rgba(245,200,76,.25)] bg-[rgba(245,200,76,.04)] p-4">
+            <div class="font-extrabold text-white/90 text-sm leading-tight">${esc(c.title || c.headline || "")}</div>
+            <div class="mt-2 text-white/65 text-xs leading-relaxed">${esc(c.body || "")}</div>
+          </div>
+        `).join("")}
+      </div>
+    </div>` : "";
+
+  // Corporate news (4-5 cards)
+  const news = findSlide("news_list");
+  const newsItems = (news?.items || []).slice(0,5);
+  const newsSection = newsItems.length ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">CORPORATE & KEY NEWS</div>
+      <div class="space-y-3">
+        ${newsItems.map(it => `
+          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+            <div class="font-extrabold text-white/90 text-sm">${esc(it.headline || "")}</div>
+            ${it.keypoints?.length ? `<div class="mt-2 text-white/60 text-xs leading-relaxed">${esc(it.keypoints.slice(0,2).join(" • "))}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>` : "";
+
+  // Market conditions (key indicators + flows)
+  const rates = findSlide("macro_rates_fx");
+  const rateItems = (rates?.items || []).slice(0,4);
+  const etfSlide = findSlide("etf_flows");
+  const inflows = (etfSlide?.inflows || []).slice(0,3);
+  const outflows = (etfSlide?.outflows || []).slice(0,3);
+
+  function etfBar(items, label, color) {
+    if (!items.length) return `<div class="text-white/40 text-sm">Data belum tersedia</div>`;
+    return items.map(it => `
+      <div class="flex items-center gap-3 py-2 border-b border-white/8">
+        <div class="w-16 text-xs font-extrabold text-white/80">${esc(it.symbol || it.ticker || "")}</div>
+        <div class="flex-1 h-4 bg-white/5 rounded overflow-hidden">
+          <div class="h-full rounded" style="width:${Math.min(100, Math.abs(it.pct || 50))}%;background:${color}"></div>
+        </div>
+        <div class="w-20 text-xs text-white/70 font-semibold text-right">${esc(it.flowUsdFmt || it.flowUsd || "—")}</div>
+      </div>
+    `).join("");
+  }
+
+  const conditionSection = (rateItems.length || inflows.length || outflows.length) ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">MARKET CONDITIONS & FLOWS</div>
+      ${rateItems.length ? `
+        <div class="grid grid-cols-4 gap-3 mb-5">
+          ${rateItems.map(it => `
+            <div class="rounded-2xl border border-white/10 bg-white/[.03] p-3 text-center">
+              <div class="text-xs text-white/50 font-semibold">${esc(it.label || "")}</div>
+              <div class="text-white/95 font-extrabold mt-1">${esc(it.valueFmt || it.value || "—")}</div>
+              ${it.note ? `<div class="text-white/50 text-[.65rem] mt-1">${esc(it.note)}</div>` : ""}
+            </div>
+          `).join("")}
+        </div>` : ""}
+      ${(inflows.length || outflows.length) ? `
+        <div class="card p-4">
+          <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-3">ETF FLOWS</div>
+          <div class="grid grid-cols-2 gap-5">
+            <div>
+              <div class="text-xs font-extrabold text-green-400/70 mb-2">TOP INFLOWS</div>
+              ${etfBar(inflows, "INFLOWS", "rgba(74,222,128,.6)")}
+            </div>
+            <div>
+              <div class="text-xs font-extrabold text-red-400/70 mb-2">TOP OUTFLOWS</div>
+              ${etfBar(outflows, "OUTFLOWS", "rgba(248,113,113,.6)")}
+            </div>
+          </div>
+        </div>` : ""}
+    </div>` : "";
+
+  // Sector summary (6 cards in 3x2 grid)
+  const sectorSlide = findSlide("sector_cards");
+  const sectorItems = (sectorSlide?.items || []).slice(0,6);
+  const sectorSection = sectorItems.length ? `
+    <div class="mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">SECTOR OVERVIEW</div>
+      <div class="grid grid-cols-3 gap-3">
+        ${sectorItems.map(it => `
+          <div class="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+            <div class="font-extrabold text-[var(--yellow)] text-xs tracking-wider mb-2">${esc(SECTOR_META[it.sector] || it.sector || "")}</div>
+            <div class="space-y-1">
+              ${(it.keypoints || []).slice(0,3).map(kp => `<div class="text-white/65 text-xs leading-relaxed">• ${esc(kp)}</div>`).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>` : "";
+
+  // Watchlist & Recommendations
+  const wp = findSlide("watchlist_playbook");
+  const watchlist = (wp?.watchlist || []).slice(0,6);
+  const playbook = (wp?.playbook || wp?.actions || []).slice(0,4);
+  const watchSection = `
+    <div class="card p-5 mt-6">
+      <div class="text-xs tracking-[.22em] font-extrabold text-[var(--yellow)] mb-4">WATCHLIST & RECOMMENDED ACTIONS</div>
+      <div class="grid grid-cols-2 gap-5">
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">WATCHLIST</div>
+          ${watchlist.map(it => {
+            const t = typeof it === "string" ? it : it.ticker || "";
+            const w = typeof it === "string" ? "" : it.why || "";
+            return `<div class="py-2 border-b border-white/8">
+              <span class="font-extrabold text-white/90 text-sm">${esc(t)}</span>
+              ${w ? `<span class="text-white/50 text-xs ml-2">${esc(w)}</span>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+        <div>
+          <div class="text-xs tracking-[.18em] font-extrabold text-white/45 mb-2">ACTIONS</div>
+          <div class="space-y-2">
+            ${playbook.map(x => `<div class="text-white/75 text-sm leading-relaxed">• ${esc(typeof x === "string" ? x : x.text || "")}</div>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-white/10 text-white/30 text-[.65rem] tracking-wide">DISCLAIMER: Not financial advice. Do your own research before making investment decisions.</div>
+    </div>`;
+
+  return `
+    <div class="px-5 py-5">
+      <div class="text-center">
+        <div class="serifTitle text-[2.3rem] font-extrabold">${esc(brief?.title || "US Pre-Market Brief")}</div>
+        ${lede ? `<div class="mt-3 text-white/70 leading-relaxed max-w-2xl mx-auto">${esc(lede)}</div>` : ""}
+      </div>
+      ${snapSection}
+      ${impactSection}
+      ${newsSection}
+      ${conditionSection}
+      ${sectorSection}
+      ${watchSection}
+    </div>
+  `;
 }
 
 async function boot(){

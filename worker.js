@@ -1099,13 +1099,13 @@ const INDICATOR_SYMBOLS = {
   USA: [
     { code: "SPX", name: "S&P 500", symbol: "^GSPC" },
     { code: "IXIC", name: "Nasdaq Composite", symbol: "^IXIC" },
+    { code: "DJI", name: "Dow Jones", symbol: "^DJI" },
+    { code: "RUT", name: "Russell 2000", symbol: "^RUT" },
+    { code: "BTC", name: "Bitcoin", symbol: "BTC-USD" },
     { code: "VIX", name: "VIX", symbol: "^VIX" },
     { code: "DXY", name: "US Dollar Index", symbol: "DX-Y.NYB" },
-    { code: "USDCNY", name: "USD/CNY", symbol: "CNY=X" },
     { code: "GOLD", name: "Gold", symbol: "GC=F" },
-    { code: "SILVER", name: "Silver", symbol: "SI=F" },
     { code: "OIL", name: "WTI Crude", symbol: "CL=F" },
-    { code: "BTC", name: "Bitcoin", symbol: "BTC-USD" },
   ],
   ASIA: [
     { code: "N225", name: "Nikkei 225", symbol: "^N225" },
@@ -1337,19 +1337,88 @@ async function genMorningBriefText(region, topItems) {
   const tz = REGION_TZ[region] || "UTC";
   const asOf = new Intl.DateTimeFormat("id-ID", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(new Date());
 
-  const input = topItems.slice(0, 10).map(it => ({
+  const input = topItems.slice(0, 12).map(it => ({
     headline: it.headline,
     sector: it.sector,
     impact: it.impact,
+    keypoints: (it.keypoints || []).slice(0, 2),
     source: it.sources?.[0]?.name || ""
   }));
 
-  const prompt = `
+  // Region-specific prompts
+  let prompt;
+  if (region === "INDONESIA") {
+    prompt = `
+Kamu menulis Morning Briefing pasar Indonesia.
+Aturan keras: Jangan mengarang fakta baru. Berdasarkan headline berikut. Output valid JSON tanpa markdown.
+
+HEADLINE LIST:
+${JSON.stringify(input, null, 2)}
+
+OUTPUT JSON — isi SEMUA field, gunakan data dari headline:
+{
+  "title": "Judul ringkas (contoh: IHSG Terkoreksi di Tengah Tekanan Asing)",
+  "lede": "1 kalimat pembuka yang merangkum kondisi pasar hari ini (50-80 kata)",
+  "flow": {
+    "foreignBuy": "estimasi nominal (contoh: Rp 2.1T)",
+    "foreignSell": "estimasi nominal (contoh: Rp 3.4T)",
+    "domesticBuy": "estimasi nominal",
+    "domesticSell": "estimasi nominal",
+    "foreignNet": { "valueFmt": "net (contoh: -Rp 1.3T)" },
+    "domesticNet": { "valueFmt": "net (contoh: +Rp 1.3T)" },
+    "topBuys": [{"ticker":"BBCA","valueFmt":"Rp 450M"},{"ticker":"BMRI","valueFmt":"Rp 320M"},{"ticker":"TLKM","valueFmt":"Rp 280M"}],
+    "topSells": [{"ticker":"BBRI","valueFmt":"Rp 520M"},{"ticker":"ASII","valueFmt":"Rp 310M"},{"ticker":"UNVR","valueFmt":"Rp 180M"}],
+    "miniNote": "IHSG turun/naik X.XX% ke level XXXX didorong oleh ... (1 kalimat)"
+  },
+  "corporateActions": [
+    {"ticker":"XXXX","company":"Nama PT","action":"Deskripsi aksi korporasi (20-30 kata)"}
+  ],
+  "topMovers": {
+    "gainers": [{"ticker":"XXXX","changePct":3.5,"why":"Alasan singkat (15-20 kata)"}],
+    "losers": [{"ticker":"XXXX","changePct":-2.8,"why":"Alasan singkat"}]
+  },
+  "watchlist": [{"ticker":"BBCA","why":"Pantau support di XXXX, foreign flow dominan"},{"ticker":"BMRI","why":"..."}],
+  "playbook": [
+    "Rekomendasi posisi 1 (contoh: Pertimbangkan defensive play di consumer staples)",
+    "Rekomendasi posisi 2 (contoh: Pantau rotasi ke sektor perbankan jika asing masuk)",
+    "Rekomendasi posisi 3 (contoh: Hedge exposure USD/IDR jika DXY menguat)",
+    "Rekomendasi posisi 4"
+  ]
+}
+
+CATATAN: flow data, topBuys/topSells, corporateActions, topMovers — infer dari headline yang ada. Jika tidak ada data, kosongkan array. Gunakan ticker Indonesia yang relevan.
+`.trim();
+  } else if (region === "USA") {
+    prompt = `
+You are writing a US Pre-Market Brief.
+Rules: Do NOT invent facts. Based on headlines below. Output valid JSON without markdown.
+
+HEADLINE LIST:
+${JSON.stringify(input, null, 2)}
+
+OUTPUT JSON — fill ALL fields using headline data:
+{
+  "title": "Short title (e.g. S&P Rallies on Strong Earnings)",
+  "lede": "Opening paragraph summarizing market conditions (50-80 words, professional tone)",
+  "etfFlows": {
+    "inflows": [{"symbol":"SPY","flowUsdFmt":"$2.1B","pct":80},{"symbol":"QQQ","flowUsdFmt":"$1.5B","pct":65},{"symbol":"IWM","flowUsdFmt":"$800M","pct":40}],
+    "outflows": [{"symbol":"TLT","flowUsdFmt":"-$1.2B","pct":55},{"symbol":"HYG","flowUsdFmt":"-$600M","pct":30},{"symbol":"XLE","flowUsdFmt":"-$400M","pct":20}]
+  },
+  "watchlist": [{"ticker":"AAPL","why":"Watch earnings reaction at $XXX support"},{"ticker":"NVDA","why":"..."}],
+  "playbook": [
+    "Action 1 (e.g. Consider rotating into quality tech on pullbacks)",
+    "Action 2 (e.g. Monitor 10Y yield for risk-off signals)",
+    "Action 3 (e.g. Hedge dollar exposure if DXY breaks above XXX)",
+    "Action 4"
+  ]
+}
+
+NOTE: etfFlows — infer from headlines. Use major ETF tickers. If no data, use empty arrays. pct is relative bar width (0-100).
+`.trim();
+  } else {
+    prompt = `
 Kamu menulis Morning Brief pasar untuk region ${region}.
-Aturan:
-- Jangan mengarang fakta baru.
-- Berdasarkan list headline berikut.
-- Output JSON tanpa markdown.
+Aturan: Jangan mengarang fakta baru. Berdasarkan headline berikut. Output JSON tanpa markdown.
 
 HEADLINE LIST:
 ${JSON.stringify(input, null, 2)}
@@ -1357,10 +1426,11 @@ ${JSON.stringify(input, null, 2)}
 OUTPUT JSON:
 {
   "title": "Judul singkat",
-  "lede": "Paragraf pembuka 2-3 kalimat (terminal style)",
-  "playbook": ["3-5 poin watchlist / playbook hari ini (bukan nasihat keuangan)"]
+  "lede": "Paragraf pembuka 1-2 kalimat (50-80 kata)",
+  "playbook": ["3-4 poin watchlist / playbook hari ini"]
 }
 `.trim();
+  }
 
   const modelFallback = [
     GEMINI_MODEL,
@@ -1374,16 +1444,33 @@ OUTPUT JSON:
       const res = await ai.models.generateContent({
         model,
         contents: prompt,
-        config: { temperature: 0.35, maxOutputTokens: 900 }
+        config: { temperature: 0.35, maxOutputTokens: 2500 }
       });
       const parsed = parseJsonFromText(res.text);
       if (!parsed || typeof parsed !== "object") throw new Error("MorningBrief output invalid");
-      return {
+
+      const result = {
         asOf,
         title: cleanText(parsed.title || ""),
         lede: cleanText(parsed.lede || ""),
         playbook: Array.isArray(parsed.playbook) ? parsed.playbook.map(x => cleanText(x)).filter(Boolean).slice(0, 6) : [],
       };
+
+      // Indonesia-specific fields
+      if (region === "INDONESIA") {
+        if (parsed.flow) result.flow = parsed.flow;
+        if (parsed.corporateActions) result.corporateActions = parsed.corporateActions;
+        if (parsed.topMovers) result.topMovers = parsed.topMovers;
+        if (parsed.watchlist) result.watchlist = parsed.watchlist;
+      }
+
+      // USA-specific fields
+      if (region === "USA") {
+        if (parsed.etfFlows) result.etfFlows = parsed.etfFlows;
+        if (parsed.watchlist) result.watchlist = parsed.watchlist;
+      }
+
+      return result;
     } catch (e) {
       console.warn(`[worker] Gemini morningBrief failed model=${model} region=${region}:`, e?.message || e);
     }
@@ -1589,81 +1676,247 @@ function pickTop(items, n = 3) {
 function buildMorningDeck(region, topItems, indicatorsForRegion, mbText) {
   const tz = REGION_TZ[region] || "UTC";
   const asOf = mbText?.asOf || new Intl.DateTimeFormat("id-ID", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(new Date());
-  const title = mbText?.title || `${region === "INDONESIA" ? "Indonesia" : region === "USA" ? "USA" : region} Morning Brief`;
-  const lede = mbText?.lede || (topItems.length ? `Tema utama: ${topItems.slice(0, 3).map(x => x.headline).join(" · ")}.` : "");
 
+  if (region === "INDONESIA") return buildDeckIndonesia(topItems, indicatorsForRegion, mbText, asOf);
+  if (region === "USA") return buildDeckUSA(topItems, indicatorsForRegion, mbText, asOf);
+
+  // Default for ASIA/EUROPE (keep original simple layout)
+  const title = mbText?.title || `${region} Morning Brief`;
+  const lede = mbText?.lede || (topItems.length ? `Tema utama: ${topItems.slice(0, 3).map(x => x.headline).join(" · ")}.` : "");
   const slides = [];
 
   if (Array.isArray(indicatorsForRegion) && indicatorsForRegion.length) {
-    slides.push({
-      type: "market_snapshot",
-      title: "Market Snapshot",
-      items: indicatorsForRegion.slice(0, 6).map(x => ({
-        label: x.code,
-        value: x.value,
-        valueFmt: x.valueFmt,
-        changePct: x.changePct,
-        note: x.name || ""
-      })),
-    });
+    slides.push({ type: "market_snapshot", title: "Market Snapshot", items: indicatorsForRegion.slice(0, 6).map(x => ({ label: x.code, value: x.value, valueFmt: x.valueFmt, changePct: x.changePct, note: x.name || "" })) });
   }
+  const impactCards = pickTop(topItems, 3);
+  if (impactCards.length) {
+    slides.push({ type: "impact_cards", title: "Top Drivers", cards: impactCards.map(it => ({ title: it.headline.slice(0, 90), body: (it.keypoints || []).slice(0, 2).join(" ") })) });
+  }
+  if (topItems.length) {
+    slides.push({ type: "news_list", title: "Headlines", items: topItems.slice(0, 5).map(it => ({ headline: it.headline, keypoints: (it.keypoints || []).slice(0, 2) })) });
+  }
+  const watchlist = extractWatchlist(region, topItems).slice(0, 6).map(t => ({ ticker: t, why: "Pantau level kunci." }));
+  const playbook = (mbText?.playbook && mbText.playbook.length) ? mbText.playbook : ["Pantau headline berdampak tinggi.", "Gunakan sizing wajar saat volatilitas naik."];
+  slides.push({ type: "watchlist_playbook", watchlist, playbook, disclaimer: "Bukan nasihat keuangan." });
+  return { title, asOf, lede, slides };
+}
 
+// -------- INDONESIA MORNING DECK --------
+function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
+  const title = mbText?.title || "Indonesia Morning Briefing";
+  const lede = mbText?.lede || "";
+  const slides = [];
+
+  // Slide 1: Market Snapshot + Flow IHSG
+  // Flow data is embedded in the market_snapshot slide
+  const indItems = (indicators || []).slice(0, 7).map(x => ({
+    label: x.code, value: x.value, valueFmt: x.valueFmt, changePct: x.changePct, note: x.name || ""
+  }));
+  const ihsg = indicators?.find(x => x.code === "IHSG" || x.symbol === "^JKSE");
+  const ihsgChange = ihsg ? `IHSG ${(ihsg.changePct >= 0 ? "+" : "")}${(ihsg.changePct || 0).toFixed(2)}% ke ${ihsg.valueFmt || ihsg.value || "—"}` : "";
+
+  slides.push({
+    type: "market_snapshot",
+    title: "Market Snapshot",
+    items: indItems,
+    flow: {
+      foreignBuy: mbText?.flow?.foreignBuy || "—",
+      foreignSell: mbText?.flow?.foreignSell || "—",
+      domesticBuy: mbText?.flow?.domesticBuy || "—",
+      domesticSell: mbText?.flow?.domesticSell || "—",
+      foreignNet: mbText?.flow?.foreignNet || { valueFmt: "—" },
+      domesticNet: mbText?.flow?.domesticNet || { valueFmt: "—" },
+      topBuys: (mbText?.flow?.topBuys || []).slice(0, 3),
+      topSells: (mbText?.flow?.topSells || []).slice(0, 3),
+      miniNote: ihsgChange || mbText?.flow?.miniNote || "",
+    }
+  });
+
+  // Slide 2: 3 Impact Events
   const impactCards = pickTop(topItems, 3);
   if (impactCards.length) {
     slides.push({
       type: "impact_cards",
-      title: "Top Drivers",
+      title: "Peristiwa Berdampak Hari Ini",
       cards: impactCards.map(it => ({
         title: it.headline.slice(0, 90),
-        body: (it.keypoints || []).slice(0, 2).join(" ")
+        body: (it.keypoints || []).slice(0, 2).join(". ").slice(0, 160)
       }))
     });
   }
 
+  // Slide 3: Important Indonesia News (4-5 cards)
   if (topItems.length) {
     slides.push({
       type: "news_list",
-      title: "Headlines (≤24 jam)",
-      items: topItems.slice(0, 8).map(it => ({
-        category: it.sector === "REGULATION" ? "REGULASI / PEMERINTAH" : "KORPORASI / SEKTOR",
+      title: "Berita Penting Indonesia",
+      items: topItems.slice(0, 5).map(it => ({
         headline: it.headline,
-        keypoints: (it.keypoints || []).slice(0, 3),
-        publishedAt: it.publishedAt,
-        sources: (it.sources || []).slice(0, 1),
+        keypoints: (it.keypoints || []).slice(0, 2),
       }))
     });
   }
 
-  const deep = pickTop(topItems.filter(x => x.story && x.story.length >= 40), 1)[0];
-  if (deep) {
+  // Slide 4: Corporate Actions + Top Movers LQ45 (merged)
+  const corpActions = (mbText?.corporateActions || []).slice(0, 4);
+  if (corpActions.length) {
     slides.push({
-      type: "deep_dive",
-      title: "Deep Dive",
-      item: {
-        headline: deep.headline,
-        body: deep.story,
-        bullets: (deep.keypoints || []).slice(0, 4),
-        sources: (deep.sources || []).slice(0, 1),
-      }
+      type: "corporate_actions",
+      title: "Corporate Action",
+      items: corpActions.map(c => ({
+        ticker: c.ticker || "",
+        company: c.company || "",
+        action: c.action || c.summary || "",
+      }))
     });
   }
 
-  const watchlist = extractWatchlist(region, topItems).slice(0, 8).map(t => ({ ticker: t, why: "Pantau reaksi headline & level kunci." }));
+  const gainers = (mbText?.topMovers?.gainers || []).slice(0, 3);
+  const losers = (mbText?.topMovers?.losers || []).slice(0, 3);
+  if (gainers.length || losers.length) {
+    slides.push({
+      type: "top_movers",
+      title: "Top Movers LQ45",
+      gainers: gainers.map(g => ({ ticker: g.ticker || "", changePct: g.changePct, why: g.why || "" })),
+      losers: losers.map(l => ({ ticker: l.ticker || "", changePct: l.changePct, why: l.why || "" })),
+    });
+  }
+
+  // Slide 5: Watchlist & Recommendations
+  const watchlist = extractWatchlist("INDONESIA", topItems).slice(0, 6).map(t => ({ ticker: t, why: "Pantau reaksi headline & level kunci." }));
   const playbook = (mbText?.playbook && mbText.playbook.length)
     ? mbText.playbook
     : [
-      "Pantau headline kebijakan dan data makro yang dapat mengubah risk sentiment.",
-      "Fokus pada berita berdampak tinggi; noise harian abaikan.",
-      "Gunakan sizing yang wajar saat volatilitas naik.",
-      "Bukan nasihat keuangan."
+      "Pantau data makro global yang berdampak ke sentimen pasar.",
+      "Perhatikan rotasi sektoral berdasarkan flow asing.",
+      "Gunakan sizing wajar saat volatilitas meningkat.",
     ];
 
   slides.push({
     type: "watchlist_playbook",
-    title: "Watchlist & Playbook",
-    watchlist,
+    watchlist: (mbText?.watchlist && mbText.watchlist.length) ? mbText.watchlist : watchlist,
     playbook,
     disclaimer: "Bukan nasihat keuangan."
+  });
+
+  return { title, asOf, lede, slides };
+}
+
+// -------- USA MORNING DECK --------
+function buildDeckUSA(topItems, indicators, mbText, asOf) {
+  const title = mbText?.title || "US Pre-Market Brief";
+  const lede = mbText?.lede || "";
+  const slides = [];
+
+  // Slide 1: Market Snapshot (S&P 500, Nasdaq, Dow, Russell, Bitcoin)
+  const wantCodes = ["SPX", "IXIC", "DJI", "RUT", "BTC"];
+  const indMap = new Map((indicators || []).map(x => [x.code, x]));
+  const snapItems = wantCodes.map(code => {
+    const x = indMap.get(code);
+    return x ? { label: x.code, value: x.value, valueFmt: x.valueFmt, changePct: x.changePct, note: x.name || "" } : null;
+  }).filter(Boolean);
+  // Add remaining indicators not in wantCodes
+  for (const x of (indicators || [])) {
+    if (!wantCodes.includes(x.code) && snapItems.length < 6) {
+      snapItems.push({ label: x.code, value: x.value, valueFmt: x.valueFmt, changePct: x.changePct, note: x.name || "" });
+    }
+  }
+
+  slides.push({
+    type: "market_snapshot",
+    title: "Market Snapshot",
+    items: snapItems,
+  });
+
+  // Slide 2: 3 Global Impact Events
+  const impactCards = pickTop(topItems, 3);
+  if (impactCards.length) {
+    slides.push({
+      type: "impact_cards",
+      title: "Global Events Impacting Markets",
+      cards: impactCards.map(it => ({
+        title: it.headline.slice(0, 90),
+        body: (it.keypoints || []).slice(0, 2).join(". ").slice(0, 160)
+      }))
+    });
+  }
+
+  // Slide 3: Corporate & Key News (4-5 items)
+  if (topItems.length) {
+    slides.push({
+      type: "news_list",
+      title: "Corporate & Key News",
+      items: topItems.slice(0, 5).map(it => ({
+        headline: it.headline,
+        keypoints: (it.keypoints || []).slice(0, 2),
+      }))
+    });
+  }
+
+  // Slide 4: Market Conditions (key rates + ETF flows)
+  const rateItems = [];
+  // Try to extract S&P Futures, 10Y Yield, DXY from indicators
+  for (const code of ["VIX", "DXY"]) {
+    const x = indMap.get(code);
+    if (x) rateItems.push({ label: x.name || x.code, value: x.value, valueFmt: x.valueFmt, note: "" });
+  }
+  // Add US 10Y and gold if available
+  for (const code of ["US10Y", "GOLD", "OIL"]) {
+    const x = indMap.get(code);
+    if (x && rateItems.length < 4) rateItems.push({ label: x.name || x.code, value: x.value, valueFmt: x.valueFmt, note: "" });
+  }
+
+  if (rateItems.length) {
+    slides.push({
+      type: "macro_rates_fx",
+      title: "Key Market Indicators",
+      items: rateItems,
+    });
+  }
+
+  // ETF flows (from mbText if Gemini generated them)
+  if (mbText?.etfFlows) {
+    slides.push({
+      type: "etf_flows",
+      title: "ETF Flows",
+      inflows: (mbText.etfFlows.inflows || []).slice(0, 3),
+      outflows: (mbText.etfFlows.outflows || []).slice(0, 3),
+    });
+  }
+
+  // Slide 5: Sector Overview (6 cards in 3x2)
+  const sectorCards = [];
+  for (const sector of SECTORS) {
+    if (sector === "GENERAL") continue;
+    const sectorItems = topItems.filter(x =>
+      x.sector === sector || (Array.isArray(x.sectors) && x.sectors.includes(sector))
+    );
+    const kps = sectorItems.slice(0, 3).map(x => x.headline.slice(0, 80));
+    if (kps.length) {
+      sectorCards.push({ sector, keypoints: kps });
+    } else {
+      sectorCards.push({ sector, keypoints: ["No significant updates in this sector."] });
+    }
+  }
+  if (sectorCards.length) {
+    slides.push({ type: "sector_cards", title: "Sector Overview", items: sectorCards });
+  }
+
+  // Slide 6: Watchlist & Recommendations
+  const watchlist = extractWatchlist("USA", topItems).slice(0, 6).map(t => ({ ticker: t, why: "Watch for headline reaction & key levels." }));
+  const playbook = (mbText?.playbook && mbText.playbook.length)
+    ? mbText.playbook
+    : [
+      "Monitor macro data releases and Fed commentary for risk sentiment shifts.",
+      "Focus on high-impact news; ignore daily noise.",
+      "Size positions appropriately during elevated volatility.",
+    ];
+
+  slides.push({
+    type: "watchlist_playbook",
+    watchlist: (mbText?.watchlist && mbText.watchlist.length) ? mbText.watchlist : watchlist,
+    playbook,
+    disclaimer: "Not financial advice."
   });
 
   return { title, asOf, lede, slides };
