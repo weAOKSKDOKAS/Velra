@@ -468,7 +468,7 @@
       </aside>
 
       <!-- CENTER -->
-      <section class="centerCol p-4 space-y-4 overflow-y-auto" style="max-height:calc(100vh - 160px)">
+      <section class="centerCol p-4 space-y-6 overflow-y-auto" style="max-height:calc(100vh - 160px)">
 
         <!-- ====== TOP NEWS PAGE (own view) ====== -->
         <div id="topNewsPage" class="hidden">
@@ -512,6 +512,8 @@
           </div>
         </div>
 
+        <div class="border-t border-white/[.04]"></div>
+
         <!-- MACRO DATA (mobile only, cloned content) -->
         <div id="macroMobile">
           <div class="card">
@@ -533,6 +535,8 @@
           </div>
         </div>
 
+        <div class="border-t border-white/[.04]"></div>
+
         <!-- KEY INDICES -->
         <div>
           <div class="flex items-center justify-between mb-2.5">
@@ -542,6 +546,8 @@
           <div class="grid grid-cols-5 gap-2" id="indicatorsGrid"></div>
         </div>
 
+        <div class="border-t border-white/[.04]"></div>
+
         <!-- NEWEST HEADLINE (no-story items) -->
         <div id="headlineSection" class="hidden">
           <div class="flex items-center justify-between mb-2">
@@ -550,6 +556,8 @@
           </div>
           <div class="card" id="headlineList"></div>
         </div>
+
+        <div class="border-t border-white/[.04]"></div>
 
         <!-- THE WIRE -->
         <div>
@@ -1283,7 +1291,9 @@ function renderWire(){
     const imp = String(it.impact||"MEDIUM").toUpperCase();
     const impCls = imp==="HIGH" ? "impactHigh" : imp==="LOW" ? "impactLow" : "impactMed";
 
-    const kp = (it.keypoints || []).slice(0,3);
+    // Filter out keypoints that just repeat the headline
+    const headlineNorm = (it.headline||"").toLowerCase().trim();
+    const kp = (it.keypoints || []).filter(k => k.toLowerCase().trim() !== headlineNorm && k.trim().length > 10).slice(0,3);
     const src = (it.sources||[]).map(s => s?.name).filter(Boolean).slice(0,2).join(" • ");
 
     const card = document.createElement("div");
@@ -1357,9 +1367,31 @@ function topNewsImage(headline, region){
 
 function tnItemLede(item) {
   const story = stripHtml(item.story || "");
-  if (story.length >= 60) return story.split(/[.!?]\s/).slice(0, 2).join(". ").slice(0, 200) + (story.length > 200 ? "..." : "");
-  if (item.keypoints?.length) return item.keypoints.slice(0, 2).join(" — ");
+  const headlineNorm = (item.headline || "").toLowerCase().trim();
+  // Use story excerpt if it's meaningfully different from headline
+  if (story.length >= 60 && story.toLowerCase().trim() !== headlineNorm) {
+    return story.split(/[.!?]\s/).slice(0, 2).join(". ").slice(0, 200) + (story.length > 200 ? "..." : "");
+  }
+  // Use keypoints if they're not just repeating the headline
+  if (item.keypoints?.length) {
+    const meaningful = item.keypoints.filter(kp => kp.toLowerCase().trim() !== headlineNorm);
+    if (meaningful.length) return meaningful.slice(0, 2).join(" — ");
+  }
   return "";
+}
+
+/** Check if a TOP NEWS item has enough content to display as a card */
+function hasCardContent(item) {
+  // Must have either a real story or meaningful keypoints
+  if (hasStory(item)) return true;
+  const headlineNorm = (item.headline || "").toLowerCase().trim();
+  if (item.keypoints?.length) {
+    const meaningful = item.keypoints.filter(kp =>
+      kp.toLowerCase().trim() !== headlineNorm && kp.trim().length > 10
+    );
+    if (meaningful.length) return true;
+  }
+  return false;
 }
 
 function renderTopNewsPage(){
@@ -1369,13 +1401,18 @@ function renderTopNewsPage(){
 
   if (!isTopNews) return;
 
-  const items = getTopNewsItems();
-  const featured = items[0];
-  const side = items.slice(1, 5);     // 4 side cards
-  const medium = items.slice(5, 8);   // 3 medium cards
-  const compact = items.slice(8, 18); // remaining compact rows
+  const allItems = getTopNewsItems();
+  // Split: items with content → cards, items without → compact headlines only
+  const withContent = allItems.filter(x => hasCardContent(x));
+  const headlineOnly = allItems.filter(x => !hasCardContent(x));
 
-  el("topNewsCount").textContent = items.length ? `${items.length} stories` : "";
+  const featured = withContent[0];
+  const side = withContent.slice(1, 5);     // 4 side cards
+  const medium = withContent.slice(5, 8);   // 3 medium cards
+  // Remaining story items + all headline-only items go to compact list
+  const compact = [...withContent.slice(8, 16), ...headlineOnly.slice(0, 10)];
+
+  el("topNewsCount").textContent = allItems.length ? `${allItems.length} stories` : "";
 
   // Sort buttons
   el("tnSortLatest").onclick = () => { state.tnSort = "latest"; renderTopNewsPage(); };
@@ -1630,18 +1667,22 @@ function renderModal(){
           ${srcLink ? `<span class="text-white/20">|</span>${srcLink}` : ""}
         </div>
 
-        ${it.keypoints?.length ? `
+        ${(() => {
+          const modalHeadNorm = (it.headline||"").toLowerCase().trim();
+          const modalKps = (it.keypoints||[]).filter(x => x.toLowerCase().trim() !== modalHeadNorm && x.trim().length > 10).slice(0,5);
+          return modalKps.length ? `
           <div class="mt-6 border-l-2 border-[var(--gold)] pl-5">
             <div class="mono text-[.6rem] tracking-[.16em] font-bold text-[var(--gold)] mb-3">KEY TAKEAWAYS</div>
             <div class="space-y-3">
-              ${it.keypoints.slice(0,5).map((x,i) => `
+              ${modalKps.map((x,i) => `
                 <div class="flex gap-3">
                   <span class="mono text-[.65rem] font-bold text-[var(--gold)] mt-0.5">${String(i+1).padStart(2,"0")}</span>
                   <span class="text-white/75 text-[.88rem] leading-relaxed">${esc(x)}</span>
                 </div>
               `).join("")}
             </div>
-          </div>` : ``}
+          </div>` : ``;
+        })()}
 
         ${hasUniqueStory ? `
           <div class="mt-6 pt-5 border-t border-white/[.06]">
