@@ -200,6 +200,31 @@
     }
     .statusBar .live{color:var(--green);}
 
+    /* ---- Headline ticker items ---- */
+    .hlItem{
+      display:flex;align-items:center;gap:.6rem;
+      padding:.45rem .7rem;
+      border-bottom:1px solid rgba(255,255,255,.03);
+      transition:background .1s;
+    }
+    .hlItem:last-child{border-bottom:none;}
+    .hlItem:hover{background:rgba(255,255,255,.015);}
+    .hlItem .hlTime{
+      font-family:var(--mono);font-size:.55rem;font-weight:600;
+      color:var(--gold);letter-spacing:.06em;
+      flex:0 0 42px;text-align:right;
+    }
+    .hlItem .hlText{
+      flex:1;min-width:0;
+      font-size:.78rem;font-weight:600;color:rgba(255,255,255,.7);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .hlItem .hlSrc{
+      font-family:var(--mono);font-size:.5rem;font-weight:600;
+      color:var(--muted);letter-spacing:.06em;
+      flex:0 0 auto;
+    }
+
     /* ---- Scrollbar ---- */
     ::-webkit-scrollbar{width:5px;}
     ::-webkit-scrollbar-track{background:transparent;}
@@ -294,6 +319,15 @@
           <div class="grid grid-cols-5 gap-2" id="indicatorsGrid"></div>
         </div>
 
+        <!-- NEWEST HEADLINE (no-story items) -->
+        <div id="headlineSection" class="hidden">
+          <div class="flex items-center justify-between mb-2">
+            <div class="secLabel">NEWEST HEADLINES</div>
+            <div class="mono text-[.48rem] tracking-[.1em] font-medium text-white/20" id="headlineCount"></div>
+          </div>
+          <div class="card" id="headlineList"></div>
+        </div>
+
         <!-- THE WIRE -->
         <div>
           <div class="flex items-center justify-between mb-2.5">
@@ -380,6 +414,8 @@ const state = {
   data: null,
   open: null,       // {type:"brief", region} | {type:"news", item}
 };
+
+const STORY_MIN_LEN = 80; // items with story shorter than this go to NEWEST HEADLINES
 
 const el = (id) => document.getElementById(id);
 
@@ -876,10 +912,48 @@ function renderIndicators(){
   });
 }
 
+function hasStory(item) {
+  const s = stripHtml(item.story || "");
+  return s.length >= STORY_MIN_LEN && s.toLowerCase() !== item.headline.toLowerCase().trim();
+}
+
+function renderHeadlines(){
+  const region = state.region;
+  const sector = state.sector;
+  const allItems = filteredWire(region, sector);
+  // Items WITHOUT a substantive story = headlines only
+  const headlines = allItems.filter(x => !hasStory(x))
+    .sort((a,b) => (safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0))
+    .slice(0, 12);
+
+  const section = el("headlineSection");
+  const list = el("headlineList");
+
+  if (!headlines.length) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+  el("headlineCount").textContent = `${headlines.length} headlines`;
+
+  list.innerHTML = headlines.map(it => {
+    const t = safeDate(it.publishedAt);
+    const timeTxt = t ? relativeTime(t) : "";
+    const src = (it.sources||[]).map(s => s?.name).filter(Boolean).slice(0,1).join("");
+    return `<div class="hlItem">
+      <span class="hlTime">${esc(timeTxt)}</span>
+      <span class="hlText">${esc(it.headline)}</span>
+      ${src ? `<span class="hlSrc">${esc(src)}</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
 function renderWire(){
   const region = state.region;
   const sector = state.sector;
-  let items = filteredWire(region, sector);
+  const allItems = filteredWire(region, sector);
+  // Only items WITH a substantive story
+  let items = allItems.filter(x => hasStory(x));
 
   if (state.sort==="impact") {
     items.sort((a,b)=>{
@@ -891,11 +965,11 @@ function renderWire(){
     items.sort((a,b)=> (safeDate(b.publishedAt)?.getTime()||0)-(safeDate(a.publishedAt)?.getTime()||0));
   }
 
-  const max = (sector==="GENERAL") ? 18 : 10;
+  const max = (sector==="GENERAL") ? 15 : 8;
   items = items.slice(0, max);
 
   el("wireTitle").textContent = `${REGION_META[region].label} / ${SECTOR_META[sector]}`;
-  el("wireMeta").textContent = "";
+  el("wireMeta").textContent = items.length ? `${items.length} stories` : "";
 
   const grid = el("wireGrid");
   grid.innerHTML = "";
@@ -906,9 +980,9 @@ function renderWire(){
     if (totalRegion === 0) {
       emptyEl.textContent = `Belum ada berita untuk ${REGION_META[region].label}. Data akan diperbarui saat worker berikutnya berjalan.`;
     } else if (sector !== "GENERAL") {
-      emptyEl.textContent = `Tidak ada berita ${SECTOR_META[sector]} untuk ${REGION_META[region].label} dalam 24 jam terakhir. (${totalRegion} berita tersedia di Umum)`;
+      emptyEl.textContent = `Tidak ada berita ${SECTOR_META[sector]} dengan story untuk ${REGION_META[region].label}. (Lihat Headlines di atas)`;
     } else {
-      emptyEl.textContent = "Tidak ada update signifikan ≤24 jam.";
+      emptyEl.textContent = "Belum ada wire dengan story. Headlines tersedia di atas.";
     }
     emptyEl.classList.remove("hidden");
     return;
@@ -957,6 +1031,7 @@ function renderAll(){
   renderBrief();
   renderMacro();
   renderIndicators();
+  renderHeadlines();
   renderWire();
   renderTicker();
 
@@ -968,6 +1043,25 @@ function renderAll(){
   const gen = safeDate(state.data?.generatedAt);
   el("lastUpdated").textContent = gen ? gen.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}) : "—";
   el("statusTime").textContent = new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+function formatStoryHtml(raw) {
+  // 1. Strip HTML and normalize whitespace
+  let text = stripHtml(raw || "");
+  // 2. Cap at 200 words
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length > 200) text = words.slice(0, 200).join(" ") + "...";
+  // 3. Split into sentences
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  // 4. Group into paragraphs of 5 sentences each
+  const paragraphs = [];
+  for (let i = 0; i < sentences.length; i += 5) {
+    paragraphs.push(sentences.slice(i, i + 5).join(" ").trim());
+  }
+  // 5. Return justified HTML paragraphs
+  return paragraphs.map(p =>
+    `<p style="text-align:justify;text-justify:inter-word;margin-bottom:.8rem;line-height:1.75;font-size:.88rem;color:rgba(255,255,255,.72);font-family:Georgia,serif">${esc(p)}</p>`
+  ).join("");
 }
 
 // ===== Modal =====
@@ -1055,7 +1149,7 @@ function renderModal(){
         ${hasUniqueStory ? `
           <div class="mt-6 pt-5 border-t border-white/[.06]">
             <div class="mono text-[.6rem] tracking-[.16em] font-bold text-white/35 mb-3">THE STORY</div>
-            <div class="text-white/70 leading-[1.75] text-[.92rem]" style="font-family:Georgia,serif;white-space:pre-wrap;">${esc(storyText)}</div>
+            <div>${formatStoryHtml(storyText)}</div>
           </div>` : ``}
       </div>
     `;

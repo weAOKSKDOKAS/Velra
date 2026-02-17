@@ -420,36 +420,45 @@ function isMarketRelevant(headline, description) {
 //   (central bank decisions, GDP, CPI, geopolitical shocks, major regulation)
 // MEDIUM: micro/sector-level events (corporate action, sector news, currency moves, earnings)
 // LOW: everything else (general news, soft stories, minor updates)
+// HIGH = ONLY whole-market macro shocks. Must be very selective.
 const IMPACT_HIGH = [
-  // Central bank / monetary policy
-  "fed fund", "fomc", "rate cut", "rate hike", "rate decision", "dovish", "hawkish",
-  "bank indonesia", "bi rate", "ecb rate", "boj rate", "boe rate", "pboc",
-  // Macro shocks
-  "recession", "default", "crisis", "crash", "circuit breaker", "black monday", "flash crash",
-  "gdp contract", "gdp shrink",
-  // Key macro data releases
-  "nfp", "non-farm", "nonfarm", "unemployment rate", "cpi release", "ppi release",
-  // Geopolitical
-  "war", "invasion", "sanction", "embargo", "trade war", "tariff war",
-  // Regulation that shakes markets
-  "emergency", "martial law", "capital control", "debt ceiling",
+  // Central bank DECISIONS (not just mentions)
+  "rate cut", "rate hike", "rate decision", "rate hold",
+  "fomc decision", "fomc statement", "fed cut", "fed hike",
+  "bi rate decision", "bi raise", "bi cut",
+  // Macro shocks / crashes
+  "recession confirm", "debt default", "market crash", "circuit breaker",
+  "flash crash", "black monday", "black swan",
+  "gdp contract", "gdp shrink", "gdp negative",
+  // Geopolitical crises
+  "invasion", "military strike", "trade war escalat", "tariff war",
+  "embargo", "martial law", "capital control", "debt ceiling breach",
+  // Emergency regulation
+  "emergency decree", "emergency regulation", "market halt",
 ];
+// MEDIUM = corporate events, sector shifts, data releases, currency moves
 const IMPACT_MED  = [
   // Corporate / micro
-  "earnings", "revenue", "profit", "loss", "guidance", "beats", "misses",
+  "earnings", "revenue beat", "revenue miss", "profit", "guidance",
   "merger", "acquisition", "takeover", "ipo", "rights issue", "buyback", "dividend",
   "corporate action", "stock split", "delisting",
   // Currency / rates
-  "currency", "forex", "exchange rate", "yield", "bond", "treasury",
-  "rupiah", "dollar", "dxy", "kurs",
+  "forex", "exchange rate", "yield", "bond", "treasury",
+  "rupiah", "dollar", "dxy",
   // Sector-level
   "oil price", "opec", "commodity", "coal price", "nickel price", "gold price",
   // Legal / probe
   "lawsuit", "probe", "investigation", "sec charge", "fraud",
-  // Medium-level data
+  // Macro data (these are MEDIUM, not HIGH)
+  "nfp", "non-farm", "nonfarm", "unemployment rate",
+  "cpi", "ppi", "inflation", "gdp",
   "pmi", "consumer confidence", "retail sales", "industrial production",
   "trade balance", "jolts", "initial claims", "housing",
-  "cpi", "ppi", "inflation", "gdp",
+  // Central bank commentary (not decisions)
+  "dovish", "hawkish", "fed fund", "fomc minute", "bank indonesia",
+  "ecb rate", "boj rate", "boe rate", "pboc",
+  // Geopolitical (not crisis level)
+  "sanction", "tariff", "trade war", "war",
 ];
 
 function normText(s) {
@@ -1304,10 +1313,10 @@ ATURAN WAJIB:
 6. Bahasa Indonesia profesional, terminal-style.
 7. Output: valid JSON array (TANPA markdown code blocks).
 
-ATURAN IMPACT:
-- HIGH = makro yang gerakkan seluruh pasar: bank sentral, GDP, CPI, geopolitik besar
-- MEDIUM = mikro/sektoral: corporate action, earnings, kurs, komoditas
-- LOW = berita umum, update ringan, opini
+ATURAN IMPACT (SANGAT KETAT — terlalu banyak HIGH = masalah):
+- HIGH = HANYA keputusan resmi bank sentral (rate cut/hike/hold), crash pasar, resesi resmi, krisis geopolitik besar (invasi, embargo). Maksimal 1-2 per batch. Jika ragu, gunakan MEDIUM.
+- MEDIUM = data makro (CPI, GDP, NFP), corporate action besar (M&A, IPO, earnings), pergerakan kurs/komoditas signifikan, kebijakan pemerintah
+- LOW = berita umum, update rutin, opini, analisis, tips, awards, penghargaan
 
 FORMAT OUTPUT — JSON array:
 [{
@@ -1316,7 +1325,7 @@ FORMAT OUTPUT — JSON array:
   "sector": one of ${JSON.stringify(SECTORS)},
   "impact": "HIGH|MEDIUM|LOW",
   "keypoints": ["poin 1", "poin 2", "poin 3"],
-  "story": "narasi profesional MINIMAL 100 kata..."
+  "story": "narasi profesional 150-200 kata. Bagi menjadi paragraf yang jelas (setiap paragraf ~5 kalimat). Pisahkan paragraf dengan newline ganda."
 }]
 `.trim();
 
