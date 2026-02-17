@@ -1683,34 +1683,78 @@ function buildDigest(region, sector, items, generatedAtIso) {
 }
 
 function pickTop(items, n = 3) {
-  return items.slice().sort((a, b) => {
+  return dedupHeadlines(items).slice().sort((a, b) => {
     const ia = impactRank(a.impact), ib = impactRank(b.impact);
     if (ia !== ib) return ib - ia;
     return (safeDate(b.publishedAt)?.getTime() || 0) - (safeDate(a.publishedAt)?.getTime() || 0);
   }).slice(0, n);
 }
 
+/**
+ * Deduplicate items by headline similarity.
+ * Two items are considered duplicates if:
+ *  - Their storyKey matches, OR
+ *  - Their normalized headline has >70% word overlap
+ */
+function dedupHeadlines(items) {
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9\s]/gi, "").replace(/\s+/g, " ").trim();
+  const wordSet = (s) => new Set(norm(s).split(" ").filter(w => w.length > 2));
+  const overlap = (a, b) => {
+    if (!a.size || !b.size) return 0;
+    let match = 0;
+    for (const w of a) { if (b.has(w)) match++; }
+    return match / Math.max(a.size, b.size);
+  };
+
+  const result = [];
+  const seenKeys = new Set();
+  const seenWordSets = [];
+
+  for (const it of (items || [])) {
+    const key = it.storyKey || it.id;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const ws = wordSet(it.headline);
+    let isDup = false;
+    for (const prev of seenWordSets) {
+      if (overlap(ws, prev) > 0.7) { isDup = true; break; }
+    }
+    if (isDup) continue;
+
+    seenWordSets.push(ws);
+    result.push(it);
+  }
+  return result;
+}
+
 function buildMorningDeck(region, topItems, indicatorsForRegion, mbText) {
   const tz = REGION_TZ[region] || "UTC";
   const asOf = mbText?.asOf || new Intl.DateTimeFormat("id-ID", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(new Date());
 
-  if (region === "INDONESIA") return buildDeckIndonesia(topItems, indicatorsForRegion, mbText, asOf);
-  if (region === "USA") return buildDeckUSA(topItems, indicatorsForRegion, mbText, asOf);
+  // CRITICAL: deduplicate items before building any deck
+  const dedupedItems = dedupHeadlines(topItems);
+
+  if (region === "INDONESIA") return buildDeckIndonesia(dedupedItems, indicatorsForRegion, mbText, asOf);
+  if (region === "USA") return buildDeckUSA(dedupedItems, indicatorsForRegion, mbText, asOf);
 
   // Default for ASIA/EUROPE (keep original simple layout)
   const title = mbText?.title || `${region} Morning Brief`;
-  const lede = mbText?.lede || (topItems.length ? `Tema utama: ${topItems.slice(0, 3).map(x => x.headline).join(" · ")}.` : "");
+  const lede = mbText?.lede || (dedupedItems.length ? `Tema utama: ${dedupedItems.slice(0, 3).map(x => x.headline).join(" · ")}.` : "");
   const slides = [];
 
   if (Array.isArray(indicatorsForRegion) && indicatorsForRegion.length) {
     slides.push({ type: "market_snapshot", title: "Market Snapshot", items: indicatorsForRegion.slice(0, 6).map(x => ({ label: x.code, value: x.value, valueFmt: x.valueFmt, changePct: x.changePct, note: x.name || "" })) });
   }
-  const impactCards = pickTop(topItems, 3);
+  const impactCards = pickTop(dedupedItems, 3);
+  const impactIds = new Set(impactCards.map(x => x.storyKey || x.id));
   if (impactCards.length) {
     slides.push({ type: "impact_cards", title: "Top Drivers", cards: impactCards.map(it => ({ title: it.headline.slice(0, 90), body: (it.keypoints || []).slice(0, 2).join(" ") })) });
   }
-  if (topItems.length) {
-    slides.push({ type: "news_list", title: "Headlines", items: topItems.slice(0, 5).map(it => ({ headline: it.headline, keypoints: (it.keypoints || []).slice(0, 2) })) });
+  // Exclude items already shown as impact cards
+  const newsItems = dedupedItems.filter(x => !impactIds.has(x.storyKey || x.id));
+  if (newsItems.length) {
+    slides.push({ type: "news_list", title: "Headlines", items: newsItems.slice(0, 5).map(it => ({ headline: it.headline, keypoints: (it.keypoints || []).slice(0, 2) })) });
   }
   const watchlist = extractWatchlist(region, topItems).slice(0, 6).map(t => ({ ticker: t, why: "Pantau level kunci." }));
   const playbook = (mbText?.playbook && mbText.playbook.length) ? mbText.playbook : ["Pantau headline berdampak tinggi.", "Gunakan sizing wajar saat volatilitas naik."];
@@ -1751,6 +1795,7 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
 
   // Slide 2: 3 Impact Events
   const impactCards = pickTop(topItems, 3);
+  const impactIds = new Set(impactCards.map(x => x.storyKey || x.id));
   if (impactCards.length) {
     slides.push({
       type: "impact_cards",
@@ -1762,12 +1807,13 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
     });
   }
 
-  // Slide 3: Important Indonesia News (4-5 cards)
-  if (topItems.length) {
+  // Slide 3: Important Indonesia News (exclude items already in impact cards)
+  const newsItems = topItems.filter(x => !impactIds.has(x.storyKey || x.id));
+  if (newsItems.length) {
     slides.push({
       type: "news_list",
       title: "Berita Penting Indonesia",
-      items: topItems.slice(0, 5).map(it => ({
+      items: newsItems.slice(0, 5).map(it => ({
         headline: it.headline,
         keypoints: (it.keypoints || []).slice(0, 2),
       }))
@@ -1847,6 +1893,7 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
 
   // Slide 2: 3 Global Impact Events
   const impactCards = pickTop(topItems, 3);
+  const impactIds = new Set(impactCards.map(x => x.storyKey || x.id));
   if (impactCards.length) {
     slides.push({
       type: "impact_cards",
@@ -1858,12 +1905,13 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
     });
   }
 
-  // Slide 3: Corporate & Key News (4-5 items)
-  if (topItems.length) {
+  // Slide 3: Corporate & Key News (exclude items already in impact cards)
+  const newsItems = topItems.filter(x => !impactIds.has(x.storyKey || x.id));
+  if (newsItems.length) {
     slides.push({
       type: "news_list",
       title: "Corporate & Key News",
-      items: topItems.slice(0, 5).map(it => ({
+      items: newsItems.slice(0, 5).map(it => ({
         headline: it.headline,
         keypoints: (it.keypoints || []).slice(0, 2),
       }))
@@ -1902,13 +1950,22 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
   }
 
   // Slide 5: Sector Overview (6 cards in 3x2)
+  // Use a global set to avoid same headline appearing in multiple sectors
+  const usedHeadlines = new Set();
   const sectorCards = [];
   for (const sector of SECTORS) {
     if (sector === "GENERAL") continue;
-    const sectorItems = topItems.filter(x =>
+    const sectorItems = dedupHeadlines(topItems.filter(x =>
       x.sector === sector || (Array.isArray(x.sectors) && x.sectors.includes(sector))
-    );
-    const kps = sectorItems.slice(0, 3).map(x => x.headline.slice(0, 80));
+    ));
+    const kps = [];
+    for (const x of sectorItems) {
+      const h = x.headline.slice(0, 80);
+      if (usedHeadlines.has(h)) continue;
+      usedHeadlines.add(h);
+      kps.push(h);
+      if (kps.length >= 3) break;
+    }
     if (kps.length) {
       sectorCards.push({ sector, keypoints: kps });
     } else {
