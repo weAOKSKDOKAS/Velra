@@ -281,26 +281,48 @@
       font-family:var(--mono);font-size:.48rem;letter-spacing:.08em;color:var(--muted2);font-weight:600;
     }
 
-    /* ---- Inline filter bar ---- */
-    .filterBar{
-      display:flex;align-items:center;gap:.6rem;padding:.55rem 0;
-      border-bottom:1px solid var(--line);margin-bottom:1rem;
+    /* ---- TOP NEWS medium card (row 2) ---- */
+    .tnMedCard{
+      background:var(--card);border:1px solid var(--line);border-radius:3px;
+      overflow:hidden;cursor:pointer;transition:all .12s;
+      display:flex;flex-direction:column;
     }
-    .filterLabel{
-      font-family:var(--mono);font-size:.52rem;letter-spacing:.14em;
-      font-weight:700;color:var(--muted);flex:0 0 auto;
+    .tnMedCard:hover{border-color:rgba(200,169,81,.18);background:var(--card2);}
+    .tnMedImg{width:100%;height:90px;object-fit:cover;display:block;background:var(--bg2);}
+    .tnMedBody{padding:.65rem .75rem;flex:1;display:flex;flex-direction:column;}
+    .tnHeadlineMd{
+      font-weight:700;font-size:.84rem;line-height:1.2;
+      color:rgba(255,255,255,.88);margin-top:.3rem;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
-    .filterPills{display:flex;gap:4px;flex-wrap:wrap;}
-    .filterPill{
-      font-family:var(--mono);font-size:.58rem;letter-spacing:.06em;
-      font-weight:700;padding:.22rem .55rem;border-radius:2px;
-      border:1px solid rgba(255,255,255,.06);background:transparent;
-      color:var(--muted);transition:all .1s;cursor:pointer;
+    .tnMedLede{
+      color:rgba(255,255,255,.42);font-size:.74rem;line-height:1.4;margin-top:.3rem;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
     }
-    .filterPill:hover{border-color:rgba(200,169,81,.2);color:var(--sub);}
-    .filterPill.active{border-color:rgba(200,169,81,.3);color:var(--gold);background:rgba(200,169,81,.06);}
-    .filterDivider{
-      width:1px;height:16px;background:var(--line);margin:0 .3rem;
+    .tnMedMeta{
+      margin-top:auto;padding-top:.35rem;display:flex;align-items:center;gap:.5rem;
+      font-family:var(--mono);font-size:.48rem;letter-spacing:.08em;color:var(--muted2);font-weight:600;
+    }
+
+    /* ---- TOP NEWS compact row (row 3) ---- */
+    .tnCompact{
+      background:var(--card);border:1px solid var(--line);border-radius:3px;
+    }
+    .tnCompactItem{
+      display:flex;align-items:center;gap:.6rem;
+      padding:.5rem .7rem;border-bottom:1px solid rgba(255,255,255,.03);
+      cursor:pointer;transition:background .1s;
+    }
+    .tnCompactItem:last-child{border-bottom:none;}
+    .tnCompactItem:hover{background:rgba(255,255,255,.015);}
+    .tnCompactRank{
+      font-family:var(--mono);font-size:.52rem;font-weight:700;
+      color:var(--muted2);width:18px;text-align:right;flex:0 0 18px;
+    }
+    .tnCompactText{
+      flex:1;min-width:0;font-size:.78rem;font-weight:600;
+      color:rgba(255,255,255,.7);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
 
     /* ---- Scrollbar ---- */
@@ -360,10 +382,15 @@
       <!-- LEFT NAV -->
       <aside class="border-r border-white/[.04] p-2.5 space-y-2.5 overflow-y-auto" style="max-height:calc(100vh - 160px)">
         <div class="navBox">
+          <button class="navItem" id="navTopNews">
+            <span style="display:flex;align-items:center;gap:6px"><span style="color:var(--gold);font-size:.7rem">&#9733;</span> TOP NEWS</span>
+          </button>
+        </div>
+        <div class="navBox">
           <div class="navTitle"><span class="dot"></span> REGION</div>
           <div id="regionNav"></div>
         </div>
-        <div class="navBox">
+        <div class="navBox" id="sectorNavBox">
           <div class="navTitle"><span class="dot" style="background:rgba(255,255,255,.18)"></span> SECTOR</div>
           <div id="sectorNav"></div>
         </div>
@@ -372,26 +399,31 @@
       <!-- CENTER -->
       <section class="p-4 space-y-4 overflow-y-auto" style="max-height:calc(100vh - 160px)">
 
-        <!-- TOP NEWS (aggregated across all regions) -->
-        <div class="topNewsWrap" id="topNewsSection">
-          <div class="flex items-center justify-between">
-            <div class="secLabel">TOP NEWS</div>
-            <div class="mono text-[.48rem] tracking-[.1em] font-medium text-white/20" id="topNewsCount"></div>
+        <!-- ====== TOP NEWS PAGE (own view) ====== -->
+        <div id="topNewsPage" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="secLabel" style="font-size:.65rem">TOP NEWS</div>
+              <div class="mono text-[.48rem] tracking-[.1em] font-medium text-white/20" id="topNewsCount"></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="btnGhost" id="tnSortLatest">LATEST</button>
+              <button class="btnGhost" id="tnSortImpact">IMPACT</button>
+            </div>
           </div>
-          <div class="tnLayout">
+          <!-- Row 1: featured + side -->
+          <div class="tnLayout" id="tnRow1">
             <div class="tnFeatured" id="tnFeatured"></div>
             <div class="tnSideList" id="tnSideList"></div>
           </div>
+          <!-- Row 2: 3 medium cards -->
+          <div class="grid grid-cols-3 gap-2.5 mt-3" id="tnRow2"></div>
+          <!-- Row 3: compact list -->
+          <div class="mt-3" id="tnRow3"></div>
         </div>
 
-        <!-- INLINE FILTER BAR -->
-        <div class="filterBar" id="filterBar">
-          <div class="filterLabel">REGION</div>
-          <div class="filterPills" id="regionPills"></div>
-          <div class="filterDivider"></div>
-          <div class="filterLabel">SECTOR</div>
-          <div class="filterPills" id="sectorPills"></div>
-        </div>
+        <!-- ====== REGION PAGE (existing content) ====== -->
+        <div id="regionPage">
 
         <!-- MORNING BRIEF / SECTOR SUMMARY (at top) -->
         <div class="card" id="briefCard">
@@ -439,6 +471,8 @@
           <div class="grid grid-cols-3 gap-2.5" id="wireGrid"></div>
           <div class="mt-4 text-white/30 text-xs hidden mono tracking-wide" id="wireEmpty">Tidak ada update signifikan &le;24 jam.</div>
         </div>
+
+        </div><!-- /regionPage -->
       </section>
 
       <!-- RIGHT: MACRO DATA -->
@@ -506,6 +540,7 @@ const REGIONS = Object.keys(REGION_META);
 const SECTORS = Object.keys(SECTOR_META);
 
 const state = {
+  page: "region",  // "topnews" | "region"
   region: "INDONESIA",
   sector: "GENERAL",
   sort: "latest",   // latest | impact
@@ -803,6 +838,11 @@ async function fetchData(){
 }
 
 function renderNav(){
+  // TOP NEWS nav item
+  const tnNav = el("navTopNews");
+  tnNav.className = "navItem" + (state.page==="topnews" ? " active" : "");
+  tnNav.onclick = () => { state.page = "topnews"; renderAll(); };
+
   const rn = el("regionNav");
   const sn = el("sectorNav");
   rn.innerHTML = "";
@@ -810,19 +850,26 @@ function renderNav(){
 
   REGIONS.forEach(r => {
     const b = document.createElement("button");
-    b.className = "navItem" + (state.region===r ? " active" : "");
+    b.className = "navItem" + (state.page==="region" && state.region===r ? " active" : "");
     b.innerHTML = `<span>${esc(REGION_META[r].label)}</span>`;
-    b.onclick = () => { state.region = r; renderAll(); };
+    b.onclick = () => { state.page = "region"; state.region = r; renderAll(); };
     rn.appendChild(b);
   });
 
-  SECTORS.forEach(s => {
-    const b = document.createElement("button");
-    b.className = "navItem" + (state.sector===s ? " active" : "");
-    b.textContent = SECTOR_META[s];
-    b.onclick = () => { state.sector = s; renderAll(); };
-    sn.appendChild(b);
-  });
+  // Show/hide sector nav depending on page
+  const sectorBox = el("sectorNavBox");
+  if (state.page === "topnews") {
+    sectorBox.style.display = "none";
+  } else {
+    sectorBox.style.display = "";
+    SECTORS.forEach(s => {
+      const b = document.createElement("button");
+      b.className = "navItem" + (state.sector===s ? " active" : "");
+      b.textContent = SECTOR_META[s];
+      b.onclick = () => { state.sector = s; renderAll(); };
+      sn.appendChild(b);
+    });
+  }
 
   el("wireSortLatest").onclick = () => { state.sort="latest"; renderWire(); };
   el("wireSortImpact").onclick = () => { state.sort="impact"; renderWire(); };
@@ -1166,33 +1213,57 @@ function topNewsImage(headline, region){
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#${cols[idx]}"/><stop offset="50%" style="stop-color:#${cols[(idx+1)%3]}"/><stop offset="100%" style="stop-color:#${cols[(idx+2)%3]}"/></linearGradient></defs><rect width="600" height="300" fill="url(#g)"/><text x="300" y="155" text-anchor="middle" font-family="monospace" font-size="10" fill="rgba(255,255,255,0.04)" letter-spacing="8">${(region||"NEWS").slice(0,12)}</text></svg>`)}`;
 }
 
-function renderTopNews(){
+function tnItemLede(item) {
+  const story = stripHtml(item.story || "");
+  if (story.length >= 60) return story.split(/[.!?]\s/).slice(0, 2).join(". ").slice(0, 200) + (story.length > 200 ? "..." : "");
+  if (item.keypoints?.length) return item.keypoints.slice(0, 2).join(" — ");
+  return "";
+}
+
+function renderTopNewsPage(){
+  const isTopNews = state.page === "topnews";
+  el("topNewsPage").classList.toggle("hidden", !isTopNews);
+  el("regionPage").classList.toggle("hidden", isTopNews);
+
+  if (!isTopNews) return;
+
   const items = getTopNewsItems();
   const featured = items[0];
-  const side = items.slice(1, 5); // 4 secondary items
+  const side = items.slice(1, 5);     // 4 side cards
+  const medium = items.slice(5, 8);   // 3 medium cards
+  const compact = items.slice(8, 18); // remaining compact rows
 
-  el("topNewsCount").textContent = items.length ? `${items.length} stories across all regions` : "";
+  el("topNewsCount").textContent = items.length ? `${items.length} stories` : "";
+
+  // Sort buttons
+  el("tnSortLatest").onclick = () => { state.tnSort = "latest"; renderTopNewsPage(); };
+  el("tnSortImpact").onclick = () => { state.tnSort = "impact"; renderTopNewsPage(); };
+  el("tnSortLatest").className = "btnGhost" + (state.tnSort === "latest" ? " active" : "");
+  el("tnSortImpact").className = "btnGhost" + (!state.tnSort || state.tnSort === "impact" ? " active" : "");
+
+  // Re-sort if needed
+  if (state.tnSort === "latest") {
+    items.sort((a,b) => (safeDate(b.publishedAt)?.getTime()||0) - (safeDate(a.publishedAt)?.getTime()||0));
+  }
 
   const featuredEl = el("tnFeatured");
   const sideEl = el("tnSideList");
+  const row2 = el("tnRow2");
+  const row3 = el("tnRow3");
 
   if (!featured) {
     featuredEl.innerHTML = `<div class="tnFeaturedBody"><div class="text-white/30 text-xs mono tracking-wide">Menunggu top news...</div></div>`;
     sideEl.innerHTML = "";
+    row2.innerHTML = "";
+    row3.innerHTML = "";
     return;
   }
 
-  // Featured card
+  // === ROW 1: Featured card (left) ===
   const ft = safeDate(featured.publishedAt);
   const fTime = ft ? relativeTime(ft) : "";
   const fSrc = (featured.sources||[]).map(s => s?.name).filter(Boolean).slice(0,1).join("");
-  const fLede = (() => {
-    // Use story excerpt or keypoints as description
-    const story = stripHtml(featured.story || "");
-    if (story.length >= 60) return story.split(/[.!?]\s/).slice(0, 2).join(". ").slice(0, 200) + (story.length > 200 ? "..." : "");
-    if (featured.keypoints?.length) return featured.keypoints.slice(0, 2).join(" — ");
-    return "";
-  })();
+  const fLede = tnItemLede(featured);
   const fImp = String(featured.impact||"MEDIUM").toUpperCase();
   const fImpCls = fImp==="HIGH" ? "impactHigh" : fImp==="LOW" ? "impactLow" : "impactMed";
   const fImg = topNewsImage(featured.headline, featured.region);
@@ -1214,7 +1285,7 @@ function renderTopNews(){
     </div>
   `;
 
-  // Side cards
+  // === ROW 1: Side cards (right) ===
   sideEl.innerHTML = "";
   side.forEach(it => {
     const t = safeDate(it.publishedAt);
@@ -1238,49 +1309,90 @@ function renderTopNews(){
     card.onclick = () => openNews(it);
     sideEl.appendChild(card);
   });
-}
 
-function renderFilterBar(){
-  const regionPills = el("regionPills");
-  const sectorPills = el("sectorPills");
+  // === ROW 2: 3 medium cards with images ===
+  row2.innerHTML = "";
+  medium.forEach(it => {
+    const t = safeDate(it.publishedAt);
+    const timeTxt = t ? relativeTime(t) : "";
+    const src = (it.sources||[]).map(s => s?.name).filter(Boolean).slice(0,1).join("");
+    const imp = String(it.impact||"MEDIUM").toUpperCase();
+    const impCls = imp==="HIGH" ? "impactHigh" : imp==="LOW" ? "impactLow" : "impactMed";
+    const lede = tnItemLede(it);
+    const img = topNewsImage(it.headline, it.region);
+    const card = document.createElement("div");
+    card.className = "tnMedCard";
+    card.innerHTML = `
+      <img class="tnMedImg" src="${img}" alt="" loading="lazy">
+      <div class="tnMedBody">
+        <div class="flex items-center gap-2">
+          <span class="tnRegion ${esc(it.region)}">${esc(it.region)}</span>
+          <span class="impactTag ${impCls}" style="font-size:.42rem">${esc(imp)}</span>
+        </div>
+        <div class="tnHeadlineMd">${esc(it.headline)}</div>
+        ${lede ? `<div class="tnMedLede">${esc(lede)}</div>` : ""}
+        <div class="tnMedMeta">
+          <span>${esc(timeTxt)}</span>
+          ${src ? `<span style="color:rgba(255,255,255,.08)">|</span><span>${esc(src)}</span>` : ""}
+        </div>
+      </div>
+    `;
+    card.onclick = () => openNews(it);
+    row2.appendChild(card);
+  });
 
-  regionPills.innerHTML = REGIONS.map(r =>
-    `<button class="filterPill${state.region===r?' active':''}" data-region="${esc(r)}">${esc(REGION_META[r].label)}</button>`
-  ).join("");
-
-  sectorPills.innerHTML = SECTORS.map(s =>
-    `<button class="filterPill${state.sector===s?' active':''}" data-sector="${esc(s)}">${esc(SECTOR_META[s])}</button>`
-  ).join("");
-
-  // Event delegation
-  regionPills.onclick = (e) => {
-    const pill = e.target.closest(".filterPill");
-    if (!pill) return;
-    state.region = pill.dataset.region;
-    renderAll();
-  };
-  sectorPills.onclick = (e) => {
-    const pill = e.target.closest(".filterPill");
-    if (!pill) return;
-    state.sector = pill.dataset.sector;
-    renderAll();
-  };
+  // === ROW 3: Compact headline list ===
+  if (compact.length) {
+    row3.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div class="secLabel" style="font-size:.52rem">MORE STORIES</div>
+        <div class="mono text-[.45rem] tracking-[.1em] font-medium text-white/18">${compact.length} more</div>
+      </div>
+      <div class="tnCompact">${compact.map((it, i) => {
+        const t = safeDate(it.publishedAt);
+        const timeTxt = t ? relativeTime(t) : "";
+        const src = (it.sources||[]).map(s => s?.name).filter(Boolean).slice(0,1).join("");
+        return `<div class="tnCompactItem" data-tn-idx="${i}">
+          <span class="tnCompactRank">${String(i + 9).padStart(2,"0")}</span>
+          <span class="tnRegion ${esc(it.region)}" style="font-size:.4rem;padding:.1rem .3rem">${esc(it.region)}</span>
+          <span class="tnCompactText">${esc(it.headline)}</span>
+          <span class="hlTime">${esc(timeTxt)}</span>
+          ${src ? `<span class="hlSrc">${esc(src)}</span>` : ""}
+        </div>`;
+      }).join("")}</div>
+    `;
+    // Attach click handlers for compact items
+    row3.querySelectorAll(".tnCompactItem").forEach((el, i) => {
+      el.onclick = () => openNews(compact[i]);
+    });
+  } else {
+    row3.innerHTML = "";
+  }
 }
 
 function renderAll(){
-  renderTopNews();
-  renderFilterBar();
+  const isTopNews = state.page === "topnews";
+
   renderNav();
-  renderBrief();
-  renderMacro();
-  renderIndicators();
-  renderHeadlines();
-  renderWire();
+  renderTopNewsPage();
+
+  if (!isTopNews) {
+    renderBrief();
+    renderMacro();
+    renderIndicators();
+    renderHeadlines();
+    renderWire();
+  }
   renderTicker();
 
   // Update region path bar
-  el("regionPathRegion").textContent = REGION_META[state.region]?.label?.toUpperCase() || state.region;
-  el("regionPathSector").textContent = SECTOR_META[state.sector] || state.sector;
+  if (isTopNews) {
+    el("regionPathRegion").textContent = "TOP NEWS";
+    el("regionPathSector").textContent = "All Regions";
+  } else {
+    el("regionPathRegion").textContent = REGION_META[state.region]?.label?.toUpperCase() || state.region;
+    el("regionPathSector").textContent = SECTOR_META[state.sector] || state.sector;
+  }
 
   // Update timestamps
   const gen = safeDate(state.data?.generatedAt);
