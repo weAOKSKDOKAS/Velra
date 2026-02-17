@@ -330,6 +330,73 @@
     ::-webkit-scrollbar-track{background:transparent;}
     ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px;}
     ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.15);}
+
+    /* ---- Mobile hamburger ---- */
+    .menuBtn{
+      display:none;background:transparent;border:1px solid rgba(255,255,255,.08);
+      border-radius:2px;padding:.3rem .45rem;cursor:pointer;
+      color:var(--sub);font-size:.9rem;line-height:1;
+    }
+    .menuBtn:hover{border-color:rgba(200,169,81,.25);color:var(--gold);}
+
+    /* ---- Sidebar overlay on mobile ---- */
+    .sidebarOverlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+      z-index:45;
+    }
+    .sidebarOverlay.show{display:block;}
+
+    /* ---- Mobile macro clone (shown in center on mobile) ---- */
+    #macroMobile{display:none;}
+
+    /* ==================== MOBILE ==================== */
+    @media(max-width:768px){
+      .menuBtn{display:block;}
+
+      /* Sidebar: fixed overlay */
+      .mainGrid{display:flex !important;flex-direction:column;}
+      .mainGrid>.sidebarDesktop{
+        position:fixed;left:-260px;top:0;bottom:0;width:240px;
+        z-index:46;background:var(--bg);border-right:1px solid var(--line);
+        padding:.75rem;overflow-y:auto;transition:left .2s ease;
+      }
+      .mainGrid>.sidebarDesktop.open{left:0;}
+
+      /* Hide desktop macro column */
+      .mainGrid>.macroDesktop{display:none !important;}
+
+      /* Show mobile macro in center content */
+      #macroMobile{display:block;}
+
+      /* Center takes full width */
+      .mainGrid>.centerCol{
+        max-height:none !important;min-height:auto;
+      }
+
+      /* Responsive grids */
+      #indicatorsGrid{grid-template-columns:repeat(2,1fr) !important;}
+      #wireGrid{grid-template-columns:1fr !important;}
+      .tnLayout{grid-template-columns:1fr !important;}
+      .tnSideList{flex-direction:column;gap:8px;}
+      #tnRow2{grid-template-columns:1fr !important;}
+
+      /* Top bar compact */
+      .topBar{padding:.35rem .75rem;}
+      .regionBar{padding:.35rem .75rem;}
+
+      /* Featured image smaller on mobile */
+      .tnFeaturedImg{height:130px;}
+      .tnHeadlineLg{font-size:1.15rem;}
+
+      /* Wire cards images */
+      .wireCard .wireImg{height:80px;}
+
+      /* Status bar */
+      .statusBar{padding:.25rem .75rem;font-size:.48rem;}
+
+      /* Modal full screen on mobile */
+      .modalPanel{width:100%;max-height:100vh;border-radius:0;}
+    }
   </style>
 </head>
 
@@ -338,7 +405,8 @@
 
     <!-- TOP BAR -->
     <div class="topBar">
-      <div class="flex items-center gap-5">
+      <div class="flex items-center gap-3">
+        <button class="menuBtn" id="menuBtn">&#9776;</button>
         <div class="brand">VELRA <span>TERMINAL</span></div>
         <div class="mono text-[.52rem] tracking-[.16em] text-white/20 font-medium hidden sm:block">MARKET INTELLIGENCE</div>
       </div>
@@ -346,7 +414,7 @@
         <div class="flex items-center gap-1.5 mono text-[.55rem] tracking-[.12em] font-semibold text-white/40">
           <span class="statusDot"></span> LIVE
         </div>
-        <button id="btnReconnect" class="btnGhost">RECONNECT</button>
+        <button id="btnReconnect" class="btnGhost hidden sm:block">RECONNECT</button>
         <div class="mono text-[.52rem] tracking-[.12em] text-white/25 font-medium">
           <span id="lastUpdated">&mdash;</span>
         </div>
@@ -376,11 +444,14 @@
       </div>
     </div>
 
+    <!-- SIDEBAR OVERLAY (mobile) -->
+    <div class="sidebarOverlay" id="sidebarOverlay"></div>
+
     <!-- MAIN GRID: sidebar + center + macro -->
-    <div class="grid grid-cols-[200px_1fr_260px] gap-0" style="min-height:calc(100vh - 130px)">
+    <div class="mainGrid grid grid-cols-[200px_1fr_260px] gap-0" style="min-height:calc(100vh - 130px)">
 
       <!-- LEFT NAV -->
-      <aside class="border-r border-white/[.04] p-2.5 space-y-2.5 overflow-y-auto" style="max-height:calc(100vh - 160px)">
+      <aside class="sidebarDesktop border-r border-white/[.04] p-2.5 space-y-2.5 overflow-y-auto" style="max-height:calc(100vh - 160px)">
         <div class="navBox">
           <button class="navItem" id="navTopNews">
             <span style="display:flex;align-items:center;gap:6px"><span style="color:var(--gold);font-size:.7rem">&#9733;</span> TOP NEWS</span>
@@ -397,7 +468,7 @@
       </aside>
 
       <!-- CENTER -->
-      <section class="p-4 space-y-4 overflow-y-auto" style="max-height:calc(100vh - 160px)">
+      <section class="centerCol p-4 space-y-4 overflow-y-auto" style="max-height:calc(100vh - 160px)">
 
         <!-- ====== TOP NEWS PAGE (own view) ====== -->
         <div id="topNewsPage" class="hidden">
@@ -441,6 +512,27 @@
           </div>
         </div>
 
+        <!-- MACRO DATA (mobile only, cloned content) -->
+        <div id="macroMobile">
+          <div class="card">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-white/[.04]">
+              <div class="secLabel text-[.55rem]">DATA MAKRO</div>
+              <div class="flex gap-1">
+                <button class="btnGhost text-[.5rem] px-1.5 py-0.5" id="macroTabMetricM">METRIK</button>
+                <button class="btnGhost text-[.5rem] px-1.5 py-0.5" id="macroTabTrendM">TREN</button>
+                <button class="btnGhost text-[.5rem] px-1.5 py-0.5" id="macroTabNextM">NEXT</button>
+              </div>
+            </div>
+            <div class="p-3">
+              <div class="mono text-[.5rem] tracking-[.1em] font-medium text-white/25 mb-2" id="macroPathM">&mdash;</div>
+              <div class="grid grid-cols-4 gap-1 text-[.5rem] mono tracking-[.1em] font-bold text-white/25 mb-2">
+                <div>METRIC</div><div class="text-right">PREV</div><div class="text-right">FCAST</div><div class="text-right">ACT</div>
+              </div>
+              <div class="text-white/35 text-xs" id="macroBodyM">Menunggu data makro...</div>
+            </div>
+          </div>
+        </div>
+
         <!-- KEY INDICES -->
         <div>
           <div class="flex items-center justify-between mb-2.5">
@@ -476,7 +568,7 @@
       </section>
 
       <!-- RIGHT: MACRO DATA -->
-      <aside class="border-l border-white/[.04] p-2.5 overflow-y-auto" style="max-height:calc(100vh - 160px)">
+      <aside class="macroDesktop border-l border-white/[.04] p-2.5 overflow-y-auto" style="max-height:calc(100vh - 160px)">
         <div class="card" id="macroCard">
           <div class="flex items-center justify-between px-3 py-2 border-b border-white/[.04]">
             <div class="secLabel text-[.55rem]">DATA MAKRO</div>
@@ -837,11 +929,23 @@ async function fetchData(){
   }
 }
 
+// ===== Mobile sidebar toggle =====
+function openSidebar(){
+  document.querySelector(".sidebarDesktop")?.classList.add("open");
+  el("sidebarOverlay")?.classList.add("show");
+}
+function closeSidebar(){
+  document.querySelector(".sidebarDesktop")?.classList.remove("open");
+  el("sidebarOverlay")?.classList.remove("show");
+}
+el("menuBtn").onclick = openSidebar;
+el("sidebarOverlay").onclick = closeSidebar;
+
 function renderNav(){
   // TOP NEWS nav item
   const tnNav = el("navTopNews");
   tnNav.className = "navItem" + (state.page==="topnews" ? " active" : "");
-  tnNav.onclick = () => { state.page = "topnews"; renderAll(); };
+  tnNav.onclick = () => { state.page = "topnews"; closeSidebar(); renderAll(); };
 
   const rn = el("regionNav");
   const sn = el("sectorNav");
@@ -852,7 +956,7 @@ function renderNav(){
     const b = document.createElement("button");
     b.className = "navItem" + (state.page==="region" && state.region===r ? " active" : "");
     b.innerHTML = `<span>${esc(REGION_META[r].label)}</span>`;
-    b.onclick = () => { state.page = "region"; state.region = r; renderAll(); };
+    b.onclick = () => { state.page = "region"; state.region = r; closeSidebar(); renderAll(); };
     rn.appendChild(b);
   });
 
@@ -866,7 +970,7 @@ function renderNav(){
       const b = document.createElement("button");
       b.className = "navItem" + (state.sector===s ? " active" : "");
       b.textContent = SECTOR_META[s];
-      b.onclick = () => { state.sector = s; renderAll(); };
+      b.onclick = () => { state.sector = s; closeSidebar(); renderAll(); };
       sn.appendChild(b);
     });
   }
@@ -878,6 +982,13 @@ function renderNav(){
   el("macroTabMetric").onclick = () => setMacroTab("metric");
   el("macroTabTrend").onclick = () => setMacroTab("trend");
   el("macroTabNext").onclick = () => setMacroTab("next");
+  // Mobile macro tabs
+  const mM = document.getElementById("macroTabMetricM");
+  const mT = document.getElementById("macroTabTrendM");
+  const mN = document.getElementById("macroTabNextM");
+  if (mM) mM.onclick = () => setMacroTab("metric");
+  if (mT) mT.onclick = () => setMacroTab("trend");
+  if (mN) mN.onclick = () => setMacroTab("next");
 }
 
 function filteredWire(region, sector){
@@ -1012,9 +1123,10 @@ function renderMacro(){
   const rows = (macro?.[tab] || []).slice(0, 8);
 
   const tabLabel = tab==="metric" ? "METRIK" : (tab==="trend" ? "TREN" : "NEXT");
-  el("macroPath").textContent = `${REGION_META[region].label} · ${tabLabel}`;
+  const pathText = `${REGION_META[region].label} · ${tabLabel}`;
+  el("macroPath").textContent = pathText;
 
-  el("macroBody").innerHTML = rows.length
+  const html = rows.length
     ? rows.map(r => `
         <div class="grid grid-cols-4 gap-2 items-start py-2 border-b border-white/10">
           <div>
@@ -1027,6 +1139,14 @@ function renderMacro(){
         </div>
       `).join("")
     : `<div class="text-white/45">Tidak ada data macro.</div>`;
+
+  el("macroBody").innerHTML = html;
+
+  // Sync mobile macro clone
+  const pathM = document.getElementById("macroPathM");
+  const bodyM = document.getElementById("macroBodyM");
+  if (pathM) pathM.textContent = pathText;
+  if (bodyM) bodyM.innerHTML = html;
 }
 
 function renderIndicators(){
