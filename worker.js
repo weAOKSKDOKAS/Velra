@@ -742,13 +742,11 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
   const snippet = cleanText(stripHtml(description || ""));
   const cleanHeadline = cleanText(headline);
 
-  // Build a meaningful fallback story from keypoints + description
+  // Build a fallback story ONLY if description is substantially richer than headline
   const kp = fallbackKeypoints(description);
   let fallbackStory = "";
-  if (kp.length) {
-    fallbackStory = kp.join(". ");
-    if (!fallbackStory.endsWith(".")) fallbackStory += ".";
-  } else if (snippet && snippet.toLowerCase() !== cleanHeadline.toLowerCase()) {
+  if (snippet && snippet.length > cleanHeadline.length * 2 && snippet.toLowerCase() !== cleanHeadline.toLowerCase()) {
+    // Only use as story if description is meaningfully longer than headline
     fallbackStory = snippet.slice(0, 650);
   }
 
@@ -1318,16 +1316,11 @@ function sanitizeRewritten(base, rewritten) {
     // Preserve existing keypoints/story if Gemini returns empty fields.
     if (kp && kp.length) out.keypoints = kp;
 
-    if (story && story.length >= 30) {
+    if (story && story.length >= 80) {
       out.story = story;
-    } else if (!out.story || out.story.length < 30) {
-      // last resort: build a minimal story from headline + keypoints
-      const kps = (out.keypoints || []).filter(Boolean);
-      const parts = [];
-      if (out.headline) parts.push(out.headline + ".");
-      if (kps.length) parts.push(kps.join(". ") + ".");
-      out.story = parts.join(" ");
     }
+    // Do NOT fabricate a story from headline + keypoints — items without a real
+    // story should go to NEWEST HEADLINES, not THE WIRE.
 
     out.llm = true;
   }

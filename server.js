@@ -127,15 +127,55 @@ const OG_FETCH_TIMEOUT = 8000;
 
 function extractOgImage(html) {
   if (!html) return "";
-  // og:image (both attribute orders)
+  // 1. og:image (both attribute orders)
   const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-  if (og?.[1]) return og[1].trim();
-  // twitter:image
+  if (og?.[1] && isValidImageUrl(og[1])) return og[1].trim();
+
+  // 2. twitter:image (both attribute orders)
   const tw = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
-  if (tw?.[1]) return tw[1].trim();
+  if (tw?.[1] && isValidImageUrl(tw[1])) return tw[1].trim();
+
+  // 3. twitter:image:src variant
+  const twSrc = html.match(/<meta[^>]+name=["']twitter:image:src["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image:src["']/i);
+  if (twSrc?.[1] && isValidImageUrl(twSrc[1])) return twSrc[1].trim();
+
+  // 4. Schema.org image in JSON-LD
+  const ldMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (ldMatch?.[1]) {
+    try {
+      const ld = JSON.parse(ldMatch[1]);
+      const img = ld.image?.url || ld.image?.contentUrl || (typeof ld.image === 'string' ? ld.image : '') || ld.thumbnailUrl || '';
+      if (img && isValidImageUrl(img)) return img.trim();
+    } catch {}
+  }
+
+  // 5. First large <img> in <article> or <main>
+  const body = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i)?.[1]
+    || html.match(/<main[^>]*>([\s\S]*?)<\/main>/i)?.[1] || "";
+  if (body) {
+    const imgs = [...body.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+    for (const m of imgs) {
+      if (m[1] && isValidImageUrl(m[1])) return m[1].trim();
+    }
+  }
+
   return "";
+}
+
+function isValidImageUrl(url) {
+  if (!url || url.length < 10) return false;
+  const lower = url.toLowerCase();
+  // Skip tiny icons, logos, tracking pixels
+  if (/(icon|logo|avatar|pixel|1x1|badge|favicon|spinner|loading|placeholder)/i.test(lower)) return false;
+  // Must look like an image URL or be from a CDN
+  if (/\.(jpg|jpeg|png|webp|gif)/i.test(lower)) return true;
+  if (/(image|img|photo|media|cdn|assets|static|upload|wp-content)/i.test(lower)) return true;
+  // og:image URLs often don't have extensions
+  if (lower.startsWith('http')) return true;
+  return false;
 }
 
 app.get('/api/og-image', async (req, res) => {
@@ -232,6 +272,60 @@ app.post('/api/og-images', express.json(), async (req, res) => {
   }
 
   res.json({ results });
+});
+
+// 5. Macro Calendar Proxy — fetches ForexFactory data for the right-side panel
+const macroCache = { data: null, ts: 0 };
+const MACRO_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+app.get('/api/macro', async (req, res) => {
+  if (macroCache.data && Date.now() - macroCache.ts < MACRO_CACHE_TTL) {
+    return res.json(macroCache.data);
+  }
+
+  const urls = [
+    "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+    "https://nfs.faireconomy.media/ff_calendar_thisweek.xml",
+  ];
+
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "accept": "*/*" },
+      });
+      clearTimeout(timer);
+      if (!response.ok) continue;
+      const text = await response.text();
+
+      let events = [];
+      if (url.endsWith(".json")) {
+        const arr = JSON.parse(text);
+        events = (Array.isArray(arr) ? arr : []).map(e => ({
+          title: e.title || "",
+          currency: e.country || "",
+          date: e.date || "",
+          time: e.time || "",
+          impact: e.impact || "",
+          actual: e.actual || "",
+          forecast: e.forecast || "",
+          previous: e.previous || "",
+        }));
+      }
+
+      if (events.length) {
+        macroCache.data = { events, updatedAt: new Date().toISOString() };
+        macroCache.ts = Date.now();
+        return res.json(macroCache.data);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  res.json({ events: [], updatedAt: null });
 });
 
 // --- STATIC ROUTES (Frontend) ---

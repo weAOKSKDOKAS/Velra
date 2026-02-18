@@ -649,7 +649,7 @@ const state = {
   open: null,       // {type:"brief", region} | {type:"news", item}
 };
 
-const STORY_MIN_LEN = 80; // items with story shorter than this go to NEWEST HEADLINES
+const STORY_MIN_LEN = 150; // items with story shorter than this go to NEWEST HEADLINES
 
 const el = (id) => document.getElementById(id);
 
@@ -722,7 +722,8 @@ async function loadOgImagesForCards(items, imgElements) {
 
   items.forEach((it, idx) => {
     if (!it || it.imageUrl) return; // worker already provided image
-    const articleUrl = it.sources?.[0]?.url || "";
+    // Prefer real articleUrl over source URL (which may be a Google News redirect)
+    const articleUrl = it.articleUrl || it.sources?.[0]?.url || "";
     if (!articleUrl) return;
     const imgEl = imgElements[idx];
     if (!imgEl) return;
@@ -735,7 +736,7 @@ async function loadOgImagesForCards(items, imgElements) {
     }
 
     urlsToFetch.push(articleUrl);
-    itemUrlMap.push({ imgEl, articleUrl });
+    itemUrlMap.push({ imgEl, articleUrl, item: it });
   });
 
   if (!urlsToFetch.length) return;
@@ -757,18 +758,35 @@ async function loadOgImagesForCards(items, imgElements) {
     }
 
     // Update img elements
-    for (const { imgEl, articleUrl } of itemUrlMap) {
+    for (const { imgEl, articleUrl, item } of itemUrlMap) {
       const imageUrl = results[articleUrl];
       if (imageUrl) {
         imgEl.src = imageUrl;
         // Also update the item in state.data so subsequent renders use it
-        const item = items.find(x => x?.sources?.[0]?.url === articleUrl);
         if (item) item.imageUrl = imageUrl;
       }
     }
   } catch (e) {
     console.warn("[og-image] batch fetch failed:", e);
   }
+}
+
+function filterMeaningfulKps(headline, keypoints) {
+  const headWords = new Set((headline||"").toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2));
+  return (keypoints||[]).filter(kp => {
+    const kpNorm = kp.toLowerCase().trim();
+    if (kpNorm.length < 12) return false;
+    // Exact match
+    if (kpNorm === (headline||"").toLowerCase().trim()) return false;
+    // Word overlap > 70% = too similar to headline
+    const kpWords = kpNorm.replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2);
+    if (kpWords.length && headWords.size) {
+      let match = 0;
+      for (const w of kpWords) { if (headWords.has(w)) match++; }
+      if (match / Math.max(kpWords.length, headWords.size) > 0.7) return false;
+    }
+    return true;
+  }).slice(0, 3);
 }
 
 function impactRank(v){
@@ -947,6 +965,7 @@ function normalizeData(raw){
         sources: Array.isArray(x.sources) ? x.sources : [],
         story: x.story || x.body || "",
         imageUrl: x.imageUrl || "",
+        articleUrl: x.articleUrl || "",
         category: x.category || null,
       };
       // Enrich item.sectors with client-side inference (for sector filter matching).
@@ -1206,6 +1225,61 @@ function renderBrief(){
   el("briefWatchlist").innerHTML = "";
 }
 
+const MACRO_REGION_CCY = {
+  INDONESIA: ["USD","CNY","JPY","IDR"],
+  USA: ["USD"],
+  ASIA: ["JPY","CNY","HKD","KRW","AUD","NZD"],
+  EUROPE: ["EUR","GBP","CHF"],
+};
+const MACRO_PRIORITY_KW = ["nonfarm","gdp","cpi","ppi","fomc","rate","employment","jobless","retail sales","pce","ism"];
+
+let macroFallbackCache = null;
+let macroFallbackTs = 0;
+
+async function ensureMacroData() {
+  // Check if worker already provided macro data
+  const macro = state.data?.macro?.regions || {};
+  let hasData = false;
+  for (const region of REGIONS) {
+    const r = macro[region] || {};
+    if ((r.metric?.length || 0) + (r.next?.length || 0) > 0) { hasData = true; break; }
+  }
+  if (hasData) return;
+
+  // Fallback: fetch from server proxy
+  if (macroFallbackCache && Date.now() - macroFallbackTs < 1800000) return; // 30min cache
+  try {
+    const res = await fetch("/api/macro?t=" + Date.now());
+    const data = await res.json();
+    if (!data.events?.length) return;
+    macroFallbackCache = data.events;
+    macroFallbackTs = Date.now();
+
+    // Build macro structure from raw events
+    if (!state.data.macro) state.data.macro = { regions: {} };
+    for (const region of REGIONS) {
+      const ccys = MACRO_REGION_CCY[region] || [];
+      const rEv = macroFallbackCache.filter(e => ccys.includes(e.currency));
+      // Filter to interesting events
+      const interesting = rEv.filter(e => {
+        const t = (e.title || "").toLowerCase();
+        const imp = (e.impact || "").toLowerCase();
+        if (imp === "high") return true;
+        if (MACRO_PRIORITY_KW.some(k => t.includes(k))) return true;
+        if (imp === "medium") return true;
+        return false;
+      });
+      const recent = interesting.filter(e => e.actual).slice(-10).reverse();
+      const next = interesting.filter(e => !e.actual).slice(0, 10);
+      state.data.macro.regions[region] = {
+        metric: recent.map(e => ({ metric: e.title, previous: e.previous, forecast: e.forecast, actual: e.actual, currency: e.currency, when: `${e.date} ${e.time}`.trim(), impact: e.impact })),
+        trend: recent.map(e => ({ metric: e.title, previous: e.previous, forecast: e.forecast, actual: e.actual, currency: e.currency, when: `${e.date} ${e.time}`.trim(), impact: e.impact })),
+        next: next.map(e => ({ metric: e.title, previous: e.previous, forecast: e.forecast, actual: e.actual, currency: e.currency, when: `${e.date} ${e.time}`.trim(), impact: e.impact })),
+      };
+    }
+  } catch (e) { console.warn("[macro] fallback fetch failed:", e); }
+}
+
 function renderMacro(){
   const region = state.region;
   const tab = state.macroTab || "metric";
@@ -1217,18 +1291,24 @@ function renderMacro(){
   el("macroPath").textContent = pathText;
 
   const html = rows.length
-    ? rows.map(r => `
-        <div class="grid grid-cols-4 gap-2 items-start py-2 border-b border-white/10">
+    ? `<div class="grid grid-cols-4 gap-2 py-1 border-b border-white/15 mb-1">
+        <div class="mono text-[.5rem] tracking-[.12em] font-bold text-white/35">EVENT</div>
+        <div class="mono text-[.5rem] tracking-[.12em] font-bold text-white/35 text-right">PREV</div>
+        <div class="mono text-[.5rem] tracking-[.12em] font-bold text-white/35 text-right">FCAST</div>
+        <div class="mono text-[.5rem] tracking-[.12em] font-bold text-white/35 text-right">ACTUAL</div>
+      </div>` +
+      rows.map(r => `
+        <div class="grid grid-cols-4 gap-2 items-start py-2 border-b border-white/[.06]">
           <div>
-            <div class="text-white/80 text-sm font-semibold">${esc(r.metric || "")}</div>
-            <div class="text-[.70rem] text-white/45 mt-1">${esc(r.currency || "")}${r.when ? ` · ${esc(r.when)}` : ""}${r.impact ? ` · ${esc(String(r.impact).toUpperCase())}` : ""}</div>
+            <div class="text-white/80 text-[.72rem] font-semibold leading-tight">${esc(r.metric || "")}</div>
+            <div class="text-[.58rem] text-white/35 mt-0.5 mono">${esc(r.currency || "")}${r.when ? ` · ${esc(r.when)}` : ""}${r.impact ? ` · <span class="${String(r.impact).toLowerCase()==='high'?'text-red-400':String(r.impact).toLowerCase()==='medium'?'text-yellow-400':'text-white/35'}">${esc(String(r.impact).toUpperCase())}</span>` : ""}</div>
           </div>
-          <div class="text-right text-white/85 font-extrabold">${esc(r.previous || "—")}</div>
-          <div class="text-right text-white/85 font-extrabold">${esc(r.forecast || "—")}</div>
-          <div class="text-right text-white/88 font-bold">${esc(r.actual || "—")}</div>
+          <div class="text-right text-white/70 text-[.75rem] font-bold mono">${esc(r.previous || "—")}</div>
+          <div class="text-right text-white/70 text-[.75rem] font-bold mono">${esc(r.forecast || "—")}</div>
+          <div class="text-right text-white/90 text-[.75rem] font-extrabold mono">${esc(r.actual || "—")}</div>
         </div>
       `).join("")
-    : `<div class="text-white/45">Tidak ada data macro.</div>`;
+    : `<div class="text-white/30 text-xs mono tracking-wide py-4">Memuat data makro ekonomi...</div>`;
 
   el("macroBody").innerHTML = html;
 
@@ -1269,8 +1349,24 @@ function renderIndicators(){
 }
 
 function hasStory(item) {
-  const s = stripHtml(item.story || "");
-  return s.length >= STORY_MIN_LEN && s.toLowerCase() !== item.headline.toLowerCase().trim();
+  const s = stripHtml(item.story || "").trim();
+  if (s.length < STORY_MIN_LEN) return false;
+  const headNorm = (item.headline || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  const storyNorm = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  // Reject if story is exact headline
+  if (storyNorm === headNorm) return false;
+  // Reject if story is mostly just the headline repeated/padded
+  const headWords = new Set(headNorm.split(/\s+/).filter(w => w.length > 2));
+  const storyWords = storyNorm.split(/\s+/).filter(w => w.length > 2);
+  if (headWords.size > 0 && storyWords.length > 0) {
+    let overlap = 0;
+    for (const w of storyWords) { if (headWords.has(w)) overlap++; }
+    // If >75% of story words are just from the headline, it's not a real story
+    if (overlap / storyWords.length > 0.75) return false;
+  }
+  // Must have meaningfully more content than the headline
+  if (s.length < headNorm.length * 1.5) return false;
+  return true;
 }
 
 function renderHeadlines(){
@@ -1351,9 +1447,7 @@ function renderWire(){
     const imp = String(it.impact||"MEDIUM").toUpperCase();
     const impCls = imp==="HIGH" ? "impactHigh" : imp==="LOW" ? "impactLow" : "impactMed";
 
-    // Filter out keypoints that just repeat the headline
-    const headlineNorm = (it.headline||"").toLowerCase().trim();
-    const kp = (it.keypoints || []).filter(k => k.toLowerCase().trim() !== headlineNorm && k.trim().length > 10).slice(0,3);
+    const kp = filterMeaningfulKps(it.headline, it.keypoints);
     const src = (it.sources||[]).map(s => s?.name).filter(Boolean).slice(0,2).join(" • ");
 
     const card = document.createElement("div");
@@ -1431,31 +1525,22 @@ function topNewsImage(headline, region){
 }
 
 function tnItemLede(item) {
-  const story = stripHtml(item.story || "");
-  const headlineNorm = (item.headline || "").toLowerCase().trim();
-  // Use story excerpt if it's meaningfully different from headline
-  if (story.length >= 60 && story.toLowerCase().trim() !== headlineNorm) {
+  // Use story excerpt if it's a real story
+  if (hasStory(item)) {
+    const story = stripHtml(item.story || "");
     return story.split(/[.!?]\s/).slice(0, 2).join(". ").slice(0, 200) + (story.length > 200 ? "..." : "");
   }
-  // Use keypoints if they're not just repeating the headline
-  if (item.keypoints?.length) {
-    const meaningful = item.keypoints.filter(kp => kp.toLowerCase().trim() !== headlineNorm);
-    if (meaningful.length) return meaningful.slice(0, 2).join(" — ");
-  }
+  // Use keypoints if they're meaningfully different from headline
+  const meaningful = filterMeaningfulKps(item.headline, item.keypoints);
+  if (meaningful.length) return meaningful.slice(0, 2).join(" — ");
   return "";
 }
 
 /** Check if a TOP NEWS item has enough content to display as a card */
 function hasCardContent(item) {
-  // Must have either a real story or meaningful keypoints
   if (hasStory(item)) return true;
-  const headlineNorm = (item.headline || "").toLowerCase().trim();
-  if (item.keypoints?.length) {
-    const meaningful = item.keypoints.filter(kp =>
-      kp.toLowerCase().trim() !== headlineNorm && kp.trim().length > 10
-    );
-    if (meaningful.length) return true;
-  }
+  const meaningful = filterMeaningfulKps(item.headline, item.keypoints);
+  if (meaningful.length) return true;
   return false;
 }
 
@@ -1720,10 +1805,8 @@ function renderModal(){
 
     const srcLink = it.sources?.[0]?.url ? `<a class="text-[var(--gold)] hover:underline font-semibold text-xs" target="_blank" rel="noopener" href="${esc(it.sources[0].url)}">${esc(it.sources[0].name||"Source")}</a>` : "";
 
+    const hasUniqueStory = hasStory(it);
     const storyText = stripHtml(it.story || "");
-    const headlineNorm = it.headline.toLowerCase().trim();
-    const storyNorm = storyText.toLowerCase().trim();
-    const hasUniqueStory = storyText && storyNorm !== headlineNorm && storyText.length > headlineNorm.length + 10;
 
     modal.body.innerHTML = `
       <div class="px-8 py-6">
@@ -1742,8 +1825,7 @@ function renderModal(){
         ${it.imageUrl ? `<div class="mt-5"><img src="${esc(it.imageUrl)}" alt="" style="width:100%;max-height:320px;object-fit:cover;border-radius:4px;background:var(--bg2);" onerror="this.parentElement.style.display='none'"></div>` : ""}
 
         ${(() => {
-          const modalHeadNorm = (it.headline||"").toLowerCase().trim();
-          const modalKps = (it.keypoints||[]).filter(x => x.toLowerCase().trim() !== modalHeadNorm && x.trim().length > 10).slice(0,5);
+          const modalKps = filterMeaningfulKps(it.headline, it.keypoints);
           return modalKps.length ? `
           <div class="mt-6 border-l-2 border-[var(--gold)] pl-5">
             <div class="mono text-[.6rem] tracking-[.16em] font-bold text-[var(--gold)] mb-3">KEY TAKEAWAYS</div>
@@ -2414,6 +2496,9 @@ async function boot(){
     await fetchData();
     renderAll();
 
+    // Fetch macro data in background if worker didn't provide it
+    ensureMacroData().then(() => { renderMacro(); }).catch(() => {});
+
     // Show status warning if data is stale or empty
     const status = state.data?.status;
     if (status && !status.ok) {
@@ -2422,7 +2507,7 @@ async function boot(){
 
     // Auto-refresh every 5 minutes
     setInterval(async () => {
-      try { await fetchData(); renderAll(); } catch(e) { console.warn("[VELRA] Auto-refresh failed:", e); }
+      try { await fetchData(); await ensureMacroData(); renderAll(); } catch(e) { console.warn("[VELRA] Auto-refresh failed:", e); }
     }, 5 * 60 * 1000);
 
   }catch(e){
