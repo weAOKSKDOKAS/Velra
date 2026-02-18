@@ -712,6 +712,65 @@ function wireImageUrl(headline, sector){
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#${c1}"/><stop offset="100%" style="stop-color:#${c2}"/></linearGradient></defs><rect width="400" height="200" fill="url(#g)"/><text x="200" y="106" text-anchor="middle" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.06)" letter-spacing="5">${(sector||"WIRE").slice(0,12)}</text></svg>`)}`;
 }
 
+// --- OG-Image lazy loader ---
+const ogImageClientCache = new Map(); // url → imageUrl
+
+async function loadOgImagesForCards(items, imgElements) {
+  // Collect article URLs that need fetching
+  const urlsToFetch = [];
+  const itemUrlMap = []; // { imgEl, articleUrl }
+
+  items.forEach((it, idx) => {
+    if (!it || it.imageUrl) return; // worker already provided image
+    const articleUrl = it.sources?.[0]?.url || "";
+    if (!articleUrl) return;
+    const imgEl = imgElements[idx];
+    if (!imgEl) return;
+
+    // Check client cache
+    const cached = ogImageClientCache.get(articleUrl);
+    if (cached !== undefined) {
+      if (cached) imgEl.src = cached;
+      return;
+    }
+
+    urlsToFetch.push(articleUrl);
+    itemUrlMap.push({ imgEl, articleUrl });
+  });
+
+  if (!urlsToFetch.length) return;
+
+  // Batch fetch from server
+  try {
+    const uniqueUrls = [...new Set(urlsToFetch)];
+    const res = await fetch("/api/og-images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: uniqueUrls }),
+    });
+    const data = await res.json();
+    const results = data.results || {};
+
+    // Cache all results and update items for future renders
+    for (const url of uniqueUrls) {
+      ogImageClientCache.set(url, results[url] || "");
+    }
+
+    // Update img elements
+    for (const { imgEl, articleUrl } of itemUrlMap) {
+      const imageUrl = results[articleUrl];
+      if (imageUrl) {
+        imgEl.src = imageUrl;
+        // Also update the item in state.data so subsequent renders use it
+        const item = items.find(x => x?.sources?.[0]?.url === articleUrl);
+        if (item) item.imageUrl = imageUrl;
+      }
+    }
+  } catch (e) {
+    console.warn("[og-image] batch fetch failed:", e);
+  }
+}
+
 function impactRank(v){
   const x = String(v||"").toUpperCase();
   if (x === "HIGH") return 3;
@@ -1316,6 +1375,10 @@ function renderWire(){
     card.onclick = () => openNews(it);
     grid.appendChild(card);
   });
+
+  // Lazy-load og:image for cards missing images
+  const wireImgs = grid.querySelectorAll(".wireImg");
+  loadOgImagesForCards(items, wireImgs);
 }
 
 function renderTicker(){
@@ -1551,6 +1614,11 @@ function renderTopNewsPage(){
   } else {
     row3.innerHTML = "";
   }
+
+  // Lazy-load og:images for featured + medium cards
+  const tnImageItems = [featured, ...medium];
+  const tnImgs = el("topNewsPage")?.querySelectorAll(".tnFeaturedImg, .tnMedImg") || [];
+  loadOgImagesForCards(tnImageItems, tnImgs);
 }
 
 function renderAll(){

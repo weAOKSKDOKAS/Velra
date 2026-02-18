@@ -120,6 +120,120 @@ app.get('/data.json', async (req, res) => {
   }
 });
 
+// 4. OG-Image Proxy — extracts og:image from article URLs for wire card covers
+const ogCache = new Map();
+const OG_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const OG_FETCH_TIMEOUT = 8000;
+
+function extractOgImage(html) {
+  if (!html) return "";
+  // og:image (both attribute orders)
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (og?.[1]) return og[1].trim();
+  // twitter:image
+  const tw = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+  if (tw?.[1]) return tw[1].trim();
+  return "";
+}
+
+app.get('/api/og-image', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ imageUrl: "" });
+
+  // Check cache
+  const cached = ogCache.get(url);
+  if (cached && Date.now() - cached.ts < OG_CACHE_TTL) {
+    return res.json({ imageUrl: cached.imageUrl });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OG_FETCH_TIMEOUT);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,*/*",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) throw new Error("Not OK");
+    const ct = response.headers.get("content-type") || "";
+    if (!ct.includes("html") && !ct.includes("text")) throw new Error("Not HTML");
+
+    const html = await response.text();
+    const imageUrl = extractOgImage(html);
+
+    ogCache.set(url, { imageUrl, ts: Date.now() });
+    res.json({ imageUrl });
+  } catch {
+    ogCache.set(url, { imageUrl: "", ts: Date.now() });
+    res.json({ imageUrl: "" });
+  }
+});
+
+// Batch endpoint: resolve multiple article URLs at once
+app.post('/api/og-images', express.json(), async (req, res) => {
+  const urls = Array.isArray(req.body?.urls) ? req.body.urls.slice(0, 30) : [];
+  if (!urls.length) return res.json({ results: {} });
+
+  const results = {};
+  const toFetch = [];
+
+  // Check cache first
+  for (const url of urls) {
+    const cached = ogCache.get(url);
+    if (cached && Date.now() - cached.ts < OG_CACHE_TTL) {
+      results[url] = cached.imageUrl;
+    } else {
+      toFetch.push(url);
+    }
+  }
+
+  // Fetch uncached in parallel (max 5 concurrent)
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+    const batch = toFetch.slice(i, i + BATCH_SIZE);
+    const settled = await Promise.allSettled(
+      batch.map(async (url) => {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), OG_FETCH_TIMEOUT);
+          const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+              "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "accept": "text/html,application/xhtml+xml,*/*",
+            },
+            redirect: "follow",
+          });
+          clearTimeout(timer);
+          if (!response.ok) return { url, imageUrl: "" };
+          const ct = response.headers.get("content-type") || "";
+          if (!ct.includes("html") && !ct.includes("text")) return { url, imageUrl: "" };
+          const html = await response.text();
+          return { url, imageUrl: extractOgImage(html) };
+        } catch {
+          return { url, imageUrl: "" };
+        }
+      })
+    );
+    for (const r of settled) {
+      const val = r.status === "fulfilled" ? r.value : { url: "", imageUrl: "" };
+      if (val.url) {
+        ogCache.set(val.url, { imageUrl: val.imageUrl, ts: Date.now() });
+        results[val.url] = val.imageUrl;
+      }
+    }
+  }
+
+  res.json({ results });
+});
+
 // --- STATIC ROUTES (Frontend) ---
 
 if (HAS_UI) {
@@ -134,7 +248,7 @@ if (HAS_UI) {
   // SPA Fallback: Any other route returns index.html (unless it matches an API route above)
   app.get('*', (req, res) => {
     // Safety check: ensure we don't return HTML for API calls that might have missed
-    if (req.path.startsWith('/data.json') || req.path.startsWith('/internal')) {
+    if (req.path.startsWith('/data.json') || req.path.startsWith('/internal') || req.path.startsWith('/api/')) {
       return res.status(404).json({ error: "Not Found" });
     }
     res.sendFile(INDEX_PATH);
