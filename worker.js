@@ -598,6 +598,66 @@ async function fetchArticleText(url) {
   }
 }
 
+/**
+ * Extract og:image (or twitter:image, or first large <img>) from HTML.
+ * Returns a URL string or "".
+ */
+function extractImageFromHtml(html) {
+  if (!html) return "";
+  // 1. og:image meta tag (most reliable)
+  const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (ogMatch?.[1]) return ogMatch[1].trim();
+
+  // 2. twitter:image meta tag
+  const twMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+  if (twMatch?.[1]) return twMatch[1].trim();
+
+  // 3. First large image in <article> or <main>
+  const body = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i)?.[1]
+    || html.match(/<main[^>]*>([\s\S]*?)<\/main>/i)?.[1]
+    || "";
+  if (body) {
+    const imgMatch = body.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
+    if (imgMatch?.[1]) {
+      const src = imgMatch[1].trim();
+      // Only use if it looks like a real image URL (not tiny icons/tracking pixels)
+      if (/\.(jpg|jpeg|png|webp)/i.test(src) && !/(icon|logo|avatar|pixel|1x1|badge)/i.test(src)) {
+        return src;
+      }
+    }
+  }
+  return "";
+}
+
+async function fetchArticleData(url) {
+  if (!url) return { text: "", imageUrl: "" };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,*/*",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timer);
+    if (!res.ok) return { text: "", imageUrl: "" };
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("html") && !contentType.includes("text")) return { text: "", imageUrl: "" };
+    const html = await res.text();
+    return {
+      text: extractTextFromHtml(html),
+      imageUrl: extractImageFromHtml(html),
+    };
+  } catch {
+    return { text: "", imageUrl: "" };
+  }
+}
+
 // Extract readable text from HTML article page.
 // Prioritizes <article>, <main>, then falls back to all <p> tags.
 function extractTextFromHtml(html) {
@@ -641,10 +701,11 @@ function extractTextFromHtml(html) {
   return result;
 }
 
-// Enrich items with real article URLs and content, with concurrency control.
+// Enrich items with real article URLs, content, and images, with concurrency control.
 const ARTICLE_CONCURRENCY = 5;
 async function enrichItemsWithArticleContent(items) {
-  const results = new Array(items.length);
+  const textResults = new Array(items.length);
+  const imageResults = new Array(items.length);
 
   // Process in batches of ARTICLE_CONCURRENCY
   for (let i = 0; i < items.length; i += ARTICLE_CONCURRENCY) {
@@ -652,23 +713,27 @@ async function enrichItemsWithArticleContent(items) {
     const batchResults = await Promise.allSettled(
       batch.map(async (item) => {
         const articleUrl = item.articleUrl || item.sources?.[0]?.url || "";
-        if (!articleUrl) return { articleText: "" };
-        const text = await fetchArticleText(articleUrl);
-        return { articleText: text };
+        if (!articleUrl) return { text: "", imageUrl: "" };
+        return fetchArticleData(articleUrl);
       })
     );
 
     for (let j = 0; j < batchResults.length; j++) {
       const idx = i + j;
-      if (batchResults[j].status === "fulfilled" && batchResults[j].value.articleText) {
-        results[idx] = batchResults[j].value.articleText;
-      } else {
-        results[idx] = "";
-      }
+      const val = batchResults[j].status === "fulfilled" ? batchResults[j].value : {};
+      textResults[idx] = val.text || "";
+      imageResults[idx] = val.imageUrl || "";
     }
   }
 
-  return results;
+  // Attach imageUrl directly to items for downstream use
+  for (let i = 0; i < items.length; i++) {
+    if (imageResults[i]) {
+      items[i].imageUrl = imageResults[i];
+    }
+  }
+
+  return textResults;
 }
 
 function makeBaseItem({ region, headline, link, publishedAt, description, sourceName, sourceUrl, articleUrl, hintSector }) {
@@ -708,6 +773,7 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
     headline: cleanHeadline,
     keypoints: kp,
     story: fallbackStory,
+    imageUrl: "", // populated later by enrichItemsWithArticleContent
     publishedAt,
     sources: [{ name: cleanText(sourceName || "Source"), url }],
     articleUrl: canonicalUrl(articleUrl || ""), // real article URL for content fetching
@@ -1554,6 +1620,7 @@ function mergeByStoryKey(oldItems, newItems) {
         sectors: (Array.isArray(it.sectors) && it.sectors.length) ? it.sectors : (Array.isArray(prev.sectors) ? prev.sectors : undefined),
         story: it.story || prev.story || "",
         keypoints: (it.keypoints && it.keypoints.length) ? it.keypoints : (prev.keypoints || []),
+        imageUrl: it.imageUrl || prev.imageUrl || "",
       });
     }
   }
@@ -1601,6 +1668,7 @@ function mergeLivewireByKey(oldItems, newItems) {
         // Preserve richest content available
         story: (it.story && it.story.length >= 40) ? it.story : (prev.story || ""),
         keypoints: (it.keypoints && it.keypoints.length) ? it.keypoints : (prev.keypoints || []),
+        imageUrl: it.imageUrl || prev.imageUrl || "",
       });
     }
   }

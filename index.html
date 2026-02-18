@@ -887,6 +887,7 @@ function normalizeData(raw){
         publishedAt: x.publishedAt || x.published_at || null,
         sources: Array.isArray(x.sources) ? x.sources : [],
         story: x.story || x.body || "",
+        imageUrl: x.imageUrl || "",
         category: x.category || null,
       };
       // Enrich item.sectors with client-side inference (for sector filter matching).
@@ -1298,9 +1299,10 @@ function renderWire(){
 
     const card = document.createElement("div");
     card.className = "wireCard";
-    const imgUrl = wireImageUrl(it.headline, it.sector);
+    const fallbackImg = wireImageUrl(it.headline, it.sector);
+    const realImg = it.imageUrl || "";
     card.innerHTML = `
-      <img class="wireImg" src="${imgUrl}" alt="" loading="lazy">
+      <img class="wireImg" src="${realImg || fallbackImg}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fallbackImg}'">
       <div class="wireBody">
         <div class="flex items-center justify-between">
           <div class="impactTag ${impCls}">${esc(imp)}</div>
@@ -1445,11 +1447,12 @@ function renderTopNewsPage(){
   const fLede = tnItemLede(featured);
   const fImp = String(featured.impact||"MEDIUM").toUpperCase();
   const fImpCls = fImp==="HIGH" ? "impactHigh" : fImp==="LOW" ? "impactLow" : "impactMed";
-  const fImg = topNewsImage(featured.headline, featured.region);
+  const fImgFallback = topNewsImage(featured.headline, featured.region);
+  const fImg = featured.imageUrl || fImgFallback;
 
   featuredEl.onclick = () => openNews(featured);
   featuredEl.innerHTML = `
-    <img class="tnFeaturedImg" src="${fImg}" alt="" loading="lazy">
+    <img class="tnFeaturedImg" src="${fImg}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fImgFallback}'">
     <div class="tnFeaturedBody">
       <div class="flex items-center gap-2">
         <span class="tnRegion ${esc(featured.region)}">${esc(featured.region)}</span>
@@ -1498,11 +1501,12 @@ function renderTopNewsPage(){
     const imp = String(it.impact||"MEDIUM").toUpperCase();
     const impCls = imp==="HIGH" ? "impactHigh" : imp==="LOW" ? "impactLow" : "impactMed";
     const lede = tnItemLede(it);
-    const img = topNewsImage(it.headline, it.region);
+    const imgFallback = topNewsImage(it.headline, it.region);
+    const img = it.imageUrl || imgFallback;
     const card = document.createElement("div");
     card.className = "tnMedCard";
     card.innerHTML = `
-      <img class="tnMedImg" src="${img}" alt="" loading="lazy">
+      <img class="tnMedImg" src="${img}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${imgFallback}'">
       <div class="tnMedBody">
         <div class="flex items-center gap-2">
           <span class="tnRegion ${esc(it.region)}">${esc(it.region)}</span>
@@ -1666,6 +1670,8 @@ function renderModal(){
           <span class="inline-flex items-center gap-1.5 mono text-[.55rem] font-bold text-[var(--green)]"><span class="statusDot" style="width:5px;height:5px"></span> LIVE</span>
           ${srcLink ? `<span class="text-white/20">|</span>${srcLink}` : ""}
         </div>
+
+        ${it.imageUrl ? `<div class="mt-5"><img src="${esc(it.imageUrl)}" alt="" style="width:100%;max-height:320px;object-fit:cover;border-radius:4px;background:var(--bg2);" onerror="this.parentElement.style.display='none'"></div>` : ""}
 
         ${(() => {
           const modalHeadNorm = (it.headline||"").toLowerCase().trim();
