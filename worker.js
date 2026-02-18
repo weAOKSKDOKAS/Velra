@@ -742,12 +742,15 @@ function makeBaseItem({ region, headline, link, publishedAt, description, source
   const snippet = cleanText(stripHtml(description || ""));
   const cleanHeadline = cleanText(headline);
 
-  // Build a fallback story ONLY if description is substantially richer than headline
+  // Build a fallback story from description if it provides real content beyond headline
   const kp = fallbackKeypoints(description);
   let fallbackStory = "";
-  if (snippet && snippet.length > cleanHeadline.length * 2 && snippet.toLowerCase() !== cleanHeadline.toLowerCase()) {
-    // Only use as story if description is meaningfully longer than headline
+  if (snippet && snippet.length >= 100 && snippet.toLowerCase() !== cleanHeadline.toLowerCase()) {
     fallbackStory = snippet.slice(0, 650);
+  } else if (kp.length >= 2) {
+    // Use multiple keypoints as a thin story
+    fallbackStory = kp.join(". ");
+    if (!fallbackStory.endsWith(".")) fallbackStory += ".";
   }
 
   const hinted = (hintSector && SECTORS.includes(String(hintSector).toUpperCase())) ? String(hintSector).toUpperCase() : null;
@@ -1318,9 +1321,10 @@ function sanitizeRewritten(base, rewritten) {
 
     if (story && story.length >= 80) {
       out.story = story;
+    } else if (kp && kp.length >= 3 && (!out.story || out.story.length < 80)) {
+      // Build a minimal story from 3+ unique keypoints (NOT headline repetition)
+      out.story = kp.join(". ") + ".";
     }
-    // Do NOT fabricate a story from headline + keypoints — items without a real
-    // story should go to NEWEST HEADLINES, not THE WIRE.
 
     out.llm = true;
   }
@@ -1907,7 +1911,24 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
   }
 
   // Slide 5: Watchlist & Recommendations
-  const watchlist = extractWatchlist("INDONESIA", topItems).slice(0, 6).map(t => ({ ticker: t, why: "Pantau reaksi headline & level kunci." }));
+  let watchlist = [];
+  if (mbText?.watchlist?.length) {
+    watchlist = mbText.watchlist;
+  } else {
+    const extracted = extractWatchlist("INDONESIA", topItems).slice(0, 6);
+    if (extracted.length >= 3) {
+      watchlist = extracted.map(t => ({ ticker: t, why: "Pantau reaksi headline & level kunci." }));
+    } else {
+      watchlist = [
+        { ticker: "BBCA", why: "Bank terbesar — barometer sentimen sektor keuangan & foreign flow." },
+        { ticker: "BBRI", why: "Bank BUMN terbesar — sensitif terhadap kebijakan pemerintah & MSCI rebalancing." },
+        { ticker: "TLKM", why: "Telekomunikasi — defensive play dengan dividen stabil, proxy pertumbuhan data." },
+        { ticker: "ASII", why: "Konglomerat otomotif — proxy konsumsi domestik & siklus ekonomi." },
+        { ticker: "BMRI", why: "Bank Mandiri — BUMN perbankan, perhatikan NIM & kualitas kredit." },
+        { ticker: "GOTO", why: "Startup digital — watch profitability path & cash burn rate." },
+      ];
+    }
+  }
   const playbook = (mbText?.playbook && mbText.playbook.length)
     ? mbText.playbook
     : [
@@ -1918,7 +1939,7 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
 
   slides.push({
     type: "watchlist_playbook",
-    watchlist: (mbText?.watchlist && mbText.watchlist.length) ? mbText.watchlist : watchlist,
+    watchlist,
     playbook,
     disclaimer: "Bukan nasihat keuangan."
   });
@@ -2016,9 +2037,25 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
   const sectorCards = [];
   for (const sector of SECTORS) {
     if (sector === "GENERAL") continue;
-    const sectorItems = dedupHeadlines(topItems.filter(x =>
+    // First try exact sector match, then use keyword inference
+    let sectorItems = dedupHeadlines(topItems.filter(x =>
       x.sector === sector || (Array.isArray(x.sectors) && x.sectors.includes(sector))
     ));
+    // If no items found via tagging, try keyword-based matching from ALL items
+    if (!sectorItems.length) {
+      const sectorKw = {
+        TECHNOLOGY: /\b(tech|ai|chip|semicon|nvidia|apple|google|microsoft|software|cloud|cyber|robot|digital|startup)\b/i,
+        FINANCE: /\b(bank|fed|ecb|rate|yield|bond|treasury|stock|earning|ipo|forex|inflation|investor|wall street)\b/i,
+        MINING_ENERGY: /\b(oil|crude|opec|gas|lng|energy|coal|mining|nickel|gold|silver|lithium|solar|ev|renewable)\b/i,
+        HEALTHCARE: /\b(health|pharma|drug|vaccine|biotech|medical|fda|hospital|cancer|clinical)\b/i,
+        REGULATION: /\b(regulat|policy|law|tariff|tax|sanction|ban|antitrust|sec|government|legislation|trade war|compliance)\b/i,
+        CONSUMER: /\b(consumer|retail|ecommerce|travel|tourism|airline|hotel|restaurant|food|automotive|car|shopping|luxury)\b/i,
+      };
+      const kw = sectorKw[sector];
+      if (kw) {
+        sectorItems = dedupHeadlines(topItems.filter(x => kw.test(x.headline)));
+      }
+    }
     const kps = [];
     for (const x of sectorItems) {
       const h = x.headline.slice(0, 80);
@@ -2029,16 +2066,34 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
     }
     if (kps.length) {
       sectorCards.push({ sector, keypoints: kps });
-    } else {
-      sectorCards.push({ sector, keypoints: ["No significant updates in this sector."] });
     }
+    // Don't push empty sectors — skip silently
   }
   if (sectorCards.length) {
     slides.push({ type: "sector_cards", title: "Sector Overview", items: sectorCards });
   }
 
   // Slide 6: Watchlist & Recommendations
-  const watchlist = extractWatchlist("USA", topItems).slice(0, 6).map(t => ({ ticker: t, why: "Watch for headline reaction & key levels." }));
+  // Prefer Gemini-generated watchlist, then extract from headlines, then use meaningful defaults
+  let watchlist = [];
+  if (mbText?.watchlist?.length) {
+    watchlist = mbText.watchlist;
+  } else {
+    const extracted = extractWatchlist("USA", topItems).slice(0, 6);
+    if (extracted.length >= 3) {
+      watchlist = extracted.map(t => ({ ticker: t, why: "Monitor for headline-driven price action." }));
+    } else {
+      // Meaningful default watchlist for US markets
+      watchlist = [
+        { ticker: "SPY", why: "S&P 500 tracker — watch for key support/resistance at session pivots." },
+        { ticker: "QQQ", why: "Nasdaq-100 — tech sentiment proxy, monitor relative strength." },
+        { ticker: "AAPL", why: "Largest US stock by market cap — bellwether for broad market." },
+        { ticker: "NVDA", why: "AI chip leader — high beta, moves with risk appetite." },
+        { ticker: "TSLA", why: "High retail interest — watch for momentum breakouts/breakdowns." },
+        { ticker: "TLT", why: "20+ Year Treasury — inverse risk indicator, yields drive equities." },
+      ];
+    }
+  }
   const playbook = (mbText?.playbook && mbText.playbook.length)
     ? mbText.playbook
     : [
@@ -2049,7 +2104,7 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
 
   slides.push({
     type: "watchlist_playbook",
-    watchlist: (mbText?.watchlist && mbText.watchlist.length) ? mbText.watchlist : watchlist,
+    watchlist,
     playbook,
     disclaimer: "Not financial advice."
   });

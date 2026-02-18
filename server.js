@@ -278,6 +278,50 @@ app.post('/api/og-images', express.json(), async (req, res) => {
 const macroCache = { data: null, ts: 0 };
 const MACRO_CACHE_TTL = 30 * 60 * 1000; // 30 min
 
+function parseFFJson(text) {
+  try {
+    const arr = JSON.parse(text);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(e => e && e.title).map(e => ({
+      title: String(e.title || "").trim(),
+      currency: String(e.country || "").trim(),
+      date: String(e.date || "").trim(),
+      time: String(e.time || "").trim(),
+      impact: String(e.impact || "").trim(),
+      actual: String(e.actual ?? "").trim(),
+      forecast: String(e.forecast ?? "").trim(),
+      previous: String(e.previous ?? "").trim(),
+    }));
+  } catch { return []; }
+}
+
+function parseFFXml(text) {
+  try {
+    // Simple XML event parser
+    const events = [];
+    const eventBlocks = text.match(/<event>([\s\S]*?)<\/event>/gi) || [];
+    for (const block of eventBlocks) {
+      const tag = (name) => {
+        const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i'));
+        return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim() : '';
+      };
+      const title = tag('title');
+      if (!title) continue;
+      events.push({
+        title,
+        currency: tag('country') || tag('currency'),
+        date: tag('date'),
+        time: tag('time'),
+        impact: tag('impact'),
+        actual: tag('actual'),
+        forecast: tag('forecast'),
+        previous: tag('previous'),
+      });
+    }
+    return events;
+  } catch { return []; }
+}
+
 app.get('/api/macro', async (req, res) => {
   if (macroCache.data && Date.now() - macroCache.ts < MACRO_CACHE_TTL) {
     return res.json(macroCache.data);
@@ -285,46 +329,53 @@ app.get('/api/macro', async (req, res) => {
 
   const urls = [
     "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+    "https://nfs.faireconomy.media/ff_calendar_nextweek.json",
     "https://nfs.faireconomy.media/ff_calendar_thisweek.xml",
   ];
 
+  const allEvents = [];
   for (const url of urls) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
+      const timer = setTimeout(() => controller.abort(), 12000);
       const response = await fetch(url, {
         signal: controller.signal,
-        headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "accept": "*/*" },
+        headers: {
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "accept": "*/*",
+        },
       });
       clearTimeout(timer);
-      if (!response.ok) continue;
+      if (!response.ok) {
+        console.warn(`[macro] ${url} returned ${response.status}`);
+        continue;
+      }
       const text = await response.text();
-
-      let events = [];
-      if (url.endsWith(".json")) {
-        const arr = JSON.parse(text);
-        events = (Array.isArray(arr) ? arr : []).map(e => ({
-          title: e.title || "",
-          currency: e.country || "",
-          date: e.date || "",
-          time: e.time || "",
-          impact: e.impact || "",
-          actual: e.actual || "",
-          forecast: e.forecast || "",
-          previous: e.previous || "",
-        }));
-      }
-
-      if (events.length) {
-        macroCache.data = { events, updatedAt: new Date().toISOString() };
-        macroCache.ts = Date.now();
-        return res.json(macroCache.data);
-      }
-    } catch {
-      continue;
+      const events = url.endsWith('.json') ? parseFFJson(text) : parseFFXml(text);
+      console.log(`[macro] ${url}: ${events.length} events`);
+      allEvents.push(...events);
+      if (allEvents.length > 0 && url.includes('thisweek')) break; // thisweek is enough
+    } catch (e) {
+      console.warn(`[macro] ${url} failed:`, e?.message || e);
     }
   }
 
+  // Deduplicate by title+date
+  const seen = new Set();
+  const unique = allEvents.filter(e => {
+    const key = `${e.title}|${e.date}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (unique.length) {
+    macroCache.data = { events: unique, updatedAt: new Date().toISOString() };
+    macroCache.ts = Date.now();
+    return res.json(macroCache.data);
+  }
+
+  console.warn(`[macro] No events found from any source`);
   res.json({ events: [], updatedAt: null });
 });
 

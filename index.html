@@ -649,7 +649,7 @@ const state = {
   open: null,       // {type:"brief", region} | {type:"news", item}
 };
 
-const STORY_MIN_LEN = 150; // items with story shorter than this go to NEWEST HEADLINES
+const STORY_MIN_LEN = 100; // items with story shorter than this go to NEWEST HEADLINES
 
 const el = (id) => document.getElementById(id);
 
@@ -1260,17 +1260,19 @@ async function ensureMacroData() {
     for (const region of REGIONS) {
       const ccys = MACRO_REGION_CCY[region] || [];
       const rEv = macroFallbackCache.filter(e => ccys.includes(e.currency));
-      // Filter to interesting events
-      const interesting = rEv.filter(e => {
+      // Prefer high/medium impact, but include all if too few
+      const scored = rEv.map(e => {
         const t = (e.title || "").toLowerCase();
         const imp = (e.impact || "").toLowerCase();
-        if (imp === "high") return true;
-        if (MACRO_PRIORITY_KW.some(k => t.includes(k))) return true;
-        if (imp === "medium") return true;
-        return false;
-      });
-      const recent = interesting.filter(e => e.actual).slice(-10).reverse();
-      const next = interesting.filter(e => !e.actual).slice(0, 10);
+        let score = 0;
+        if (imp === "high") score = 3;
+        else if (imp === "medium") score = 2;
+        else score = 1;
+        if (MACRO_PRIORITY_KW.some(k => t.includes(k))) score += 2;
+        return { ...e, _score: score };
+      }).sort((a,b) => b._score - a._score);
+      const recent = scored.filter(e => e.actual).slice(0, 10);
+      const next = scored.filter(e => !e.actual).slice(0, 10);
       state.data.macro.regions[region] = {
         metric: recent.map(e => ({ metric: e.title, previous: e.previous, forecast: e.forecast, actual: e.actual, currency: e.currency, when: `${e.date} ${e.time}`.trim(), impact: e.impact })),
         trend: recent.map(e => ({ metric: e.title, previous: e.previous, forecast: e.forecast, actual: e.actual, currency: e.currency, when: `${e.date} ${e.time}`.trim(), impact: e.impact })),
@@ -1355,17 +1357,14 @@ function hasStory(item) {
   const storyNorm = s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
   // Reject if story is exact headline
   if (storyNorm === headNorm) return false;
-  // Reject if story is mostly just the headline repeated/padded
+  // Reject if story is mostly just the headline words repeated
   const headWords = new Set(headNorm.split(/\s+/).filter(w => w.length > 2));
   const storyWords = storyNorm.split(/\s+/).filter(w => w.length > 2);
   if (headWords.size > 0 && storyWords.length > 0) {
     let overlap = 0;
     for (const w of storyWords) { if (headWords.has(w)) overlap++; }
-    // If >75% of story words are just from the headline, it's not a real story
     if (overlap / storyWords.length > 0.75) return false;
   }
-  // Must have meaningfully more content than the headline
-  if (s.length < headNorm.length * 1.5) return false;
   return true;
 }
 
@@ -1533,6 +1532,11 @@ function tnItemLede(item) {
   // Use keypoints if they're meaningfully different from headline
   const meaningful = filterMeaningfulKps(item.headline, item.keypoints);
   if (meaningful.length) return meaningful.slice(0, 2).join(" — ");
+  // Fallback: use story even if short (better than nothing)
+  const story = stripHtml(item.story || "").trim();
+  if (story.length > 30 && story.toLowerCase() !== (item.headline||"").toLowerCase().trim()) {
+    return story.slice(0, 200) + (story.length > 200 ? "..." : "");
+  }
   return "";
 }
 
