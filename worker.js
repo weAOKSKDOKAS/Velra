@@ -177,6 +177,24 @@ function cleanText(s) {
     .trim();
 }
 
+// Strip source name suffix from Google News RSS titles.
+// Google News titles are typically: "Headline text - SourceName.com"
+function stripSourceSuffix(title, sourceName) {
+  let h = String(title || "").trim();
+  // Try removing " - SourceName" at the end
+  if (sourceName) {
+    const suffix = ` - ${sourceName}`;
+    if (h.endsWith(suffix)) h = h.slice(0, -suffix.length).trim();
+    // Also try with en-dash
+    const suffix2 = ` – ${sourceName}`;
+    if (h.endsWith(suffix2)) h = h.slice(0, -suffix2.length).trim();
+  }
+  // Generic: strip " - AnySource" pattern at the end (2-60 chars after " - ")
+  // This catches cases like "Headline - kumparan.com", "Headline - ANTARA News"
+  h = h.replace(/\s+[-–—]\s+[A-Za-z][A-Za-z0-9\s.·,]{1,58}$/, "").trim();
+  return h || String(title || "").trim();
+}
+
 function stripHtml(s) {
   return String(s || "")
     .replace(/<[^>]*>/g, " ")
@@ -557,18 +575,27 @@ function canonicalUrl(u) {
 }
 
 // Extract real article URL from Google News RSS <description> HTML.
-// Google News RSS description contains: <a href="https://real-article-url.com/...">headline</a>
+// Google News RSS description contains multiple <a href="..."> tags:
+//   - Some point to google.com/... redirects
+//   - Some point to the actual article (reuters.com, cnbc.com, etc.)
+// We want the first non-Google URL.
 function extractArticleUrlFromDesc(descHtml) {
   if (!descHtml) return "";
-  const match = String(descHtml).match(/href="([^"]+)"/);
-  if (!match) return "";
-  const url = canonicalUrl(match[1]);
-  // Skip if it's still a Google News URL
-  try {
-    const u = new URL(url);
-    if (u.hostname.endsWith("news.google.com")) return "";
-  } catch { return ""; }
-  return url;
+  const str = String(descHtml);
+  // Find all href values
+  const matches = [...str.matchAll(/href="([^"]+)"/gi)];
+  for (const m of matches) {
+    const url = canonicalUrl(m[1]);
+    try {
+      const u = new URL(url);
+      // Skip Google redirect URLs
+      if (u.hostname.endsWith("news.google.com")) continue;
+      if (u.hostname.endsWith("google.com") && u.pathname.includes("/url")) continue;
+      // Found a real article URL
+      return url;
+    } catch { continue; }
+  }
+  return "";
 }
 
 // Fetch article text content from a URL. Returns first ~2000 chars of article body.
@@ -712,9 +739,16 @@ async function enrichItemsWithArticleContent(items) {
     const batch = items.slice(i, i + ARTICLE_CONCURRENCY);
     const batchResults = await Promise.allSettled(
       batch.map(async (item) => {
-        const articleUrl = item.articleUrl || item.sources?.[0]?.url || "";
-        if (!articleUrl) return { text: "", imageUrl: "" };
-        return fetchArticleData(articleUrl);
+        // Try articleUrl first (direct), then source URL (may be Google redirect that follows)
+        const urls = [
+          item.articleUrl,
+          item.sources?.[0]?.url,
+        ].filter(Boolean);
+        for (const url of urls) {
+          const result = await fetchArticleData(url);
+          if (result.text && result.text.length > 50) return result;
+        }
+        return { text: "", imageUrl: "" };
       })
     );
 
@@ -826,12 +860,14 @@ async function fetchRss(url) {
     // Google News RSS: real article URL is in <a href="..."> inside description HTML
     const realUrl = extractArticleUrlFromDesc(desc);
     const rssSourceUrl = canonicalUrl(it.source?.url ?? "");
+    const rawSourceName = cleanText(it.source?.text ?? it.source);
+    const rawTitle = cleanText(it.title?.text ?? it.title);
     return {
-      title: cleanText(it.title?.text ?? it.title),
+      title: stripSourceSuffix(rawTitle, rawSourceName),
       link,
       pubDate: it.pubDate?.text ?? it.pubDate,
       description: desc,
-      sourceName: cleanText(it.source?.text ?? it.source),
+      sourceName: rawSourceName,
       // Prefer: real article URL from description > RSS source url > Google News redirect link
       sourceUrl: realUrl || rssSourceUrl || link,
       articleUrl: realUrl || "", // real article URL for content fetching
@@ -1306,7 +1342,8 @@ function sanitizeRewritten(base, rewritten) {
 
     const story = cleanText(rewritten.story || "");
 
-    out.headline = headline || out.headline;
+    // Strip source suffix from Gemini-rewritten headline too
+    out.headline = headline ? stripSourceSuffix(headline, "") : out.headline;
     out.impact = ["HIGH", "MEDIUM", "LOW"].includes(impact) ? impact : out.impact;
     out.sector = SECTORS.includes(sector) ? sector : out.sector;
 
@@ -1316,11 +1353,41 @@ function sanitizeRewritten(base, rewritten) {
       out.sectors = Array.from(new Set([out.sector, ...prevS])).filter(s => s && s !== "GENERAL");
     }
 
-    // Preserve existing keypoints/story if Gemini returns empty fields.
-    if (kp && kp.length) out.keypoints = kp;
+    // Filter keypoints that are too similar to headline
+    if (kp && kp.length) {
+      const headNorm = (out.headline || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      const headWords = new Set(headNorm.split(/\s+/).filter(w => w.length > 2));
+      const filteredKp = kp.filter(k => {
+        const kNorm = k.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+        if (kNorm === headNorm) return false;
+        if (headWords.size > 0) {
+          const kWords = kNorm.split(/\s+/).filter(w => w.length > 2);
+          let overlap = 0;
+          for (const w of kWords) { if (headWords.has(w)) overlap++; }
+          if (kWords.length > 0 && overlap / kWords.length > 0.7) return false;
+        }
+        return true;
+      });
+      out.keypoints = filteredKp.length ? filteredKp : kp;
+    }
 
+    // Validate story isn't just a headline paraphrase
     if (story && story.length >= 80) {
-      out.story = story;
+      const headNorm = (out.headline || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      const storyNorm = story.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      const headWords = new Set(headNorm.split(/\s+/).filter(w => w.length > 2));
+      const storyWords = storyNorm.split(/\s+/).filter(w => w.length > 2);
+      let overlap = 0;
+      for (const w of storyWords) { if (headWords.has(w)) overlap++; }
+      const overlapRatio = storyWords.length > 0 ? overlap / storyWords.length : 0;
+      // Accept story if it has enough unique words (less than 60% overlap with headline)
+      if (overlapRatio < 0.6 || storyWords.length > headWords.size * 2) {
+        out.story = story;
+      } else if (out.story && out.story.length >= 80) {
+        // Keep existing story if Gemini's is too similar to headline
+      } else {
+        out.story = story; // Accept even overlapping story if we have nothing better
+      }
     } else if (kp && kp.length >= 3 && (!out.story || out.story.length < 80)) {
       // Build a minimal story from 3+ unique keypoints (NOT headline repetition)
       out.story = kp.join(". ") + ".";
@@ -1362,33 +1429,43 @@ async function rewriteItemsWithGemini(region, items, articleTexts = []) {
   });
 
   const prompt = `
-Kamu adalah editor senior pasar finansial di terminal Bloomberg-style. Tugasmu menulis ulang berita menjadi laporan profesional.
+Kamu adalah editor senior pasar finansial di terminal Bloomberg-style. Tugasmu menulis ulang berita menjadi laporan profesional yang KAYA KONTEKS.
 
 INPUT (array):
 ${JSON.stringify(payload, null, 2)}
 
-ATURAN WAJIB:
-1. Setiap item HARUS memiliki "story" minimal 100 kata. Ini WAJIB — jangan pernah kosongkan field story.
-2. Jika "hasFullArticle" true: gunakan description untuk membuat narasi kaya 150-200 kata.
-3. Jika "hasFullArticle" false: kembangkan headline menjadi narasi informatif 100-150 kata. Jelaskan konteks pasar, dampak potensial, dan implikasi investor. Gunakan pengetahuanmu tentang pasar finansial untuk memberikan konteks yang relevan.
-4. Keypoints: 3 poin BERBEDA dari headline, informatif & spesifik, masing-masing ±25 kata.
-5. Jangan mengarang angka spesifik atau kutipan yang tidak ada di input.
-6. Bahasa Indonesia profesional, terminal-style.
-7. Output: valid JSON array (TANPA markdown code blocks).
+ATURAN KRITIS — Story HARUS BERBEDA dari Headline:
+1. "story" WAJIB minimal 100 kata dan DILARANG hanya mengulang/parafrase headline.
+2. Story harus berisi: (a) LATAR BELAKANG — konteks mengapa ini penting, (b) DAMPAK PASAR — efek ke sektor/saham/indeks terkait, (c) OUTLOOK — apa yang diperhatikan investor selanjutnya.
+3. Jika "hasFullArticle" true: rangkum description menjadi narasi kaya 150-200 kata.
+4. Jika "hasFullArticle" false: JANGAN hanya memparafrase headline. Gunakan pengetahuanmu tentang:
+   - Sejarah & konteks topik tersebut
+   - Dampak ke sektor/saham terkait
+   - Posisi dalam siklus ekonomi/pasar
+   - Implikasi untuk investor
+   Tulis narasi informatif 100-150 kata yang memberikan VALUE TAMBAH di atas headline.
+5. Keypoints: 3 poin yang WAJIB memberikan informasi BARU, BUKAN mengulang headline.
+   - Poin 1: fakta/angka spesifik atau konteks historis
+   - Poin 2: dampak ke sektor/pasar/emiten terkait
+   - Poin 3: apa yang harus dipantau selanjutnya (katalis, risiko, level kunci)
+   Masing-masing ±25 kata. SETIAP poin harus punya isi berbeda dari headline.
+6. Jangan mengarang angka spesifik atau kutipan yang tidak ada di input.
+7. Bahasa Indonesia profesional, terminal-style.
+8. Output: valid JSON array (TANPA markdown code blocks).
 
-ATURAN IMPACT (SANGAT KETAT — terlalu banyak HIGH = masalah):
-- HIGH = HANYA keputusan resmi bank sentral (rate cut/hike/hold), crash pasar, resesi resmi, krisis geopolitik besar (invasi, embargo). Maksimal 1-2 per batch. Jika ragu, gunakan MEDIUM.
-- MEDIUM = data makro (CPI, GDP, NFP), corporate action besar (M&A, IPO, earnings), pergerakan kurs/komoditas signifikan, kebijakan pemerintah
-- LOW = berita umum, update rutin, opini, analisis, tips, awards, penghargaan
+ATURAN IMPACT (SANGAT KETAT):
+- HIGH = HANYA keputusan resmi bank sentral (rate cut/hike/hold), crash pasar, resesi resmi, krisis geopolitik besar. Maks 1-2 per batch.
+- MEDIUM = data makro (CPI, GDP, NFP), corporate action besar, pergerakan kurs/komoditas signifikan, kebijakan pemerintah
+- LOW = berita umum, update rutin, opini, analisis
 
 FORMAT OUTPUT — JSON array:
 [{
   "storyKey": "...",
-  "headline": "headline rapi (maks 110 char)",
+  "headline": "headline rapi (maks 110 char, TANPA nama sumber di akhir)",
   "sector": one of ${JSON.stringify(SECTORS)},
   "impact": "HIGH|MEDIUM|LOW",
-  "keypoints": ["poin 1", "poin 2", "poin 3"],
-  "story": "narasi profesional 150-200 kata. Bagi menjadi paragraf yang jelas (setiap paragraf ~5 kalimat). Pisahkan paragraf dengan newline ganda."
+  "keypoints": ["poin 1 — konteks/fakta", "poin 2 — dampak pasar", "poin 3 — yang dipantau"],
+  "story": "narasi profesional 150-200 kata. Paragraf 1: latar belakang & konteks. Paragraf 2: dampak & implikasi pasar. Paragraf 3: outlook & katalis. Pisahkan paragraf dengan newline ganda."
 }]
 `.trim();
 
@@ -1684,20 +1761,44 @@ function localHourMinute(region, date = new Date()) {
   return { hour: Number(get("hour")), minute: Number(get("minute")) };
 }
 
+/**
+ * Extract watchlist tickers with contextual "why" from actual news headlines.
+ * Returns array of { ticker, why } objects.
+ */
 function extractWatchlist(region, items) {
-  const texts = items.map(x => x.headline).join(" ");
-  const tickers = new Set();
-  if (region === "INDONESIA") {
-    (texts.match(/\b[A-Z]{4}\b/g) || []).forEach(t => tickers.add(t));
-  } else if (region === "USA") {
-    const bad = new Set(["US","AI","THE","AND","FED","ECB","OJK","BI","EU","UK","DJI","SPX","ET","HKT"]);
-    (texts.match(/\b[A-Z]{1,5}\b/g) || []).forEach(t => {
-      if (t.length === 1) return;
-      if (bad.has(t)) return;
-      tickers.add(t);
-    });
+  const badTickers = new Set(["US","AI","THE","AND","FED","ECB","OJK","BI","EU","UK","DJI","SPX","ET","HKT",
+    "GDP","CPI","NFP","CEO","CFO","IPO","ETF","USD","IDR","EUR","JPY","GBP","CNN","BBC","WHO","IMF",
+    "TOP","NEW","FOR","ALL","NOT","ARE","HAS","HIS","HER","WAS","BUT","HAD","CEO","RBI","BOJ","BOE",
+    "YOY","QOQ","MOM","PDB","BPS","ORI","SUN","API","UBS","PMI","ISM","ADP","PPI","PCE"]);
+
+  const tickerPattern = region === "INDONESIA" ? /\b([A-Z]{4})\b/g : /\b([A-Z]{2,5})\b/g;
+
+  // Gather ticker → headline associations
+  const tickerHeadlines = new Map(); // ticker → [headline, ...]
+  for (const item of items) {
+    const headline = item.headline || "";
+    const matches = [...headline.matchAll(tickerPattern)];
+    for (const m of matches) {
+      const t = m[1];
+      if (badTickers.has(t)) continue;
+      if (!tickerHeadlines.has(t)) tickerHeadlines.set(t, []);
+      tickerHeadlines.get(t).push(headline);
+    }
   }
-  return Array.from(tickers).slice(0, 10);
+
+  // Sort by frequency (most mentioned first)
+  const sorted = [...tickerHeadlines.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  // Build watchlist with contextual "why"
+  return sorted.slice(0, 10).map(([ticker, headlines]) => {
+    // Use the first headline as context, truncated
+    const ctx = headlines[0].slice(0, 100);
+    const count = headlines.length;
+    const why = count > 1
+      ? `Disebut di ${count} berita — ${ctx}`
+      : `Pantau reaksi: ${ctx}`;
+    return { ticker, why };
+  });
 }
 
 function digestBullets(items) {
@@ -1738,7 +1839,7 @@ function digestBullets(items) {
 
 function buildDigest(region, sector, items, generatedAtIso) {
   const bullets = digestBullets(items).slice(0, 6);
-  const wl = extractWatchlist(region, items).map(t => `${t} — pantau reaksi headline & level kunci.`);
+  const wl = extractWatchlist(region, items).map(t => `${t.ticker} — ${t.why}`);
   return {
     title: sector === "GENERAL" ? "Market Update" : `${sector.replace("_", " ")} Update`,
     bullets,
@@ -1821,7 +1922,7 @@ function buildMorningDeck(region, topItems, indicatorsForRegion, mbText) {
   if (newsItems.length) {
     slides.push({ type: "news_list", title: "Headlines", items: newsItems.slice(0, 5).map(it => ({ headline: it.headline, keypoints: (it.keypoints || []).slice(0, 2) })) });
   }
-  const watchlist = extractWatchlist(region, topItems).slice(0, 6).map(t => ({ ticker: t, why: "Pantau level kunci." }));
+  const watchlist = extractWatchlist(region, topItems).slice(0, 6);
   const playbook = (mbText?.playbook && mbText.playbook.length) ? mbText.playbook : ["Pantau headline berdampak tinggi.", "Gunakan sizing wajar saat volatilitas naik."];
   slides.push({ type: "watchlist_playbook", watchlist, playbook, disclaimer: "Bukan nasihat keuangan." });
   return { title, asOf, lede, slides };
@@ -1910,14 +2011,47 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
     });
   }
 
-  // Slide 5: Watchlist & Recommendations
+  // Slide 5: Sector Overview (3x2 grid — like USA deck)
+  const idSectorKw = {
+    TECHNOLOGY: /\b(tech|teknologi|ai|chip|semikon|nvidia|apple|google|microsoft|software|cloud|siber|robot|digital|startup)\b/i,
+    FINANCE: /\b(bank|bi |ojk|suku bunga|yield|obligasi|saham|ihsg|idx|bursa|ipo|forex|rupiah|inflasi|investor|kredit|fintech)\b/i,
+    MINING_ENERGY: /\b(minyak|oil|crude|opec|gas|lng|energi|batu ?bara|tambang|nikel|emas|gold|tembaga|lithium|baterai|solar|ev|pln)\b/i,
+    HEALTHCARE: /\b(kesehatan|health|farmasi|pharma|obat|vaksin|biotek|medis|bpjs|rumah sakit|klinik)\b/i,
+    REGULATION: /\b(regulasi|kebijakan|aturan|tarif|pajak|sanksi|larangan|antitrust|pemerintah|legislasi|uu |perppu|omnibus)\b/i,
+    CONSUMER: /\b(konsumen|ritel|retail|ecommerce|e-commerce|travel|pariwisata|airline|hotel|restoran|makanan|otomotif|mobil|belanja|fmcg)\b/i,
+  };
+  const usedIdHeadlines = new Set();
+  const idSectorCards = [];
+  for (const sector of SECTORS) {
+    if (sector === "GENERAL") continue;
+    let sItems = dedupHeadlines(topItems.filter(x =>
+      x.sector === sector || (Array.isArray(x.sectors) && x.sectors.includes(sector))
+    ));
+    if (!sItems.length && idSectorKw[sector]) {
+      sItems = dedupHeadlines(topItems.filter(x => idSectorKw[sector].test(x.headline)));
+    }
+    const kps = [];
+    for (const x of sItems) {
+      const h = x.headline.slice(0, 80);
+      if (usedIdHeadlines.has(h)) continue;
+      usedIdHeadlines.add(h);
+      kps.push(h);
+      if (kps.length >= 3) break;
+    }
+    if (kps.length) idSectorCards.push({ sector, keypoints: kps });
+  }
+  if (idSectorCards.length) {
+    slides.push({ type: "sector_cards", title: "Ringkasan Sektoral", items: idSectorCards });
+  }
+
+  // Slide 6: Watchlist & Recommendations
   let watchlist = [];
   if (mbText?.watchlist?.length) {
     watchlist = mbText.watchlist;
   } else {
-    const extracted = extractWatchlist("INDONESIA", topItems).slice(0, 6);
+    const extracted = extractWatchlist("INDONESIA", topItems).slice(0, 8);
     if (extracted.length >= 3) {
-      watchlist = extracted.map(t => ({ ticker: t, why: "Pantau reaksi headline & level kunci." }));
+      watchlist = extracted;
     } else {
       watchlist = [
         { ticker: "BBCA", why: "Bank terbesar — barometer sentimen sektor keuangan & foreign flow." },
@@ -1925,7 +2059,9 @@ function buildDeckIndonesia(topItems, indicators, mbText, asOf) {
         { ticker: "TLKM", why: "Telekomunikasi — defensive play dengan dividen stabil, proxy pertumbuhan data." },
         { ticker: "ASII", why: "Konglomerat otomotif — proxy konsumsi domestik & siklus ekonomi." },
         { ticker: "BMRI", why: "Bank Mandiri — BUMN perbankan, perhatikan NIM & kualitas kredit." },
-        { ticker: "GOTO", why: "Startup digital — watch profitability path & cash burn rate." },
+        { ticker: "UNVR", why: "Consumer goods — proxy inflasi & daya beli masyarakat." },
+        { ticker: "GOTO", why: "Startup digital — pantau profitabilitas & burn rate." },
+        { ticker: "ANTM", why: "Tambang emas/nikel — proxy harga komoditas & kebijakan hilirisasi." },
       ];
     }
   }
@@ -2081,7 +2217,7 @@ function buildDeckUSA(topItems, indicators, mbText, asOf) {
   } else {
     const extracted = extractWatchlist("USA", topItems).slice(0, 6);
     if (extracted.length >= 3) {
-      watchlist = extracted.map(t => ({ ticker: t, why: "Monitor for headline-driven price action." }));
+      watchlist = extracted;
     } else {
       // Meaningful default watchlist for US markets
       watchlist = [
